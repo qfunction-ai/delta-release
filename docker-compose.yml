@@ -172,7 +172,9 @@ services:
       # Force DNS over TCP (Landlock sandbox blocks UDP; glibc reads
       # RES_OPTIONS at resolver init). Replaces the old /etc/resolv.conf
       # write in startup.sh which fails under read_only: true.
-      - RES_OPTIONS=use-vc
+      # NOTE: This breaks DNS on Windows Docker Desktop (internal resolver
+      # uses UDP). Only set on Linux hosts.
+      - RES_OPTIONS=${LETTA_RES_OPTIONS:-}
       # Landlock sandbox: allow tools to make outbound TCP connections
       # (e.g. CrowdStrike API, external data sources). Deny-by-default
       # is the secure posture; this opts in for Delta's deployment.
