@@ -22,7 +22,7 @@ services:
       - DELTA_PIPSIDECAR_URL=http://pip-sidecar:8001
       - DELTA_EVAL_URL=http://eval:8003
       - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
-      - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-}
+      - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DELTA_SETUP_TOKEN=${DELTA_SETUP_TOKEN:-}
       - DELTA_DEV_MODE=${DELTA_DEV_MODE:-false}
       - EXA_API_KEY=${EXA_API_KEY:-}
