@@ -102,7 +102,7 @@ services:
       sh -c "mkdir -p /data/logs && chown 1000:1000 /data/logs &&
              docker-entrypoint.sh postgres 2>&1 | tee /data/logs/postgres.log"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U delta -d delta"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U delta -d delta"]
       interval: 5s
       timeout: 5s
       retries: 5
