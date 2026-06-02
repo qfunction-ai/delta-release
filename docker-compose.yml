@@ -96,7 +96,6 @@ services:
       - POSTGRES_DB=delta
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
       - logs:/data/logs
     command: >
       sh -c "mkdir -p /data/logs && chown 1000:1000 /data/logs &&
