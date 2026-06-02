@@ -1,0 +1,21 @@
+# Root .dockerignore — used by eval/ and pip-sidecar/ Dockerfiles (context: .)
+.git
+.github
+.env
+.env.*
+!.env.example
+node_modules
+__pycache__
+*.pyc
+.pytest_cache
+.coverage
+coverage
+*.egg-info
+dist
+build
+.DS_Store
+*.md
+!README.md
+mockups
+frontend/coverage
+frontend/node_modules

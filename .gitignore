@@ -1,0 +1,38 @@
+# Environment
+.env.ci-test
+
+# Docker Compose — prevent accidental override recreation
+docker-compose.override.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+
+# IDE
+.vscode/
+.idea/
+
+# Docker volumes
+postgres_data/
+letta_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage
+.coverage
+.htmlcov/
+coverage.xml
+frontend/coverage/
+
+# Letta agent memory (local only)
+.letta/

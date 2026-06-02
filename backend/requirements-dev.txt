@@ -1,0 +1,14 @@
+# Dev/test dependencies — not included in production Docker image
+# Install: pip install -r requirements-dev.txt
+# (Also install production deps first: pip install -r requirements.txt)
+
+# Linting
+ruff>=0.4
+
+# Coverage
+coverage>=7.0
+
+# Testing
+pytest==8.3.5
+pytest-asyncio==0.24.0
+aiosqlite==0.20.0

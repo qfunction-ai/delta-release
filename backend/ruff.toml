@@ -1,0 +1,13 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W", "I"]
+ignore = [
+    "E402",   # module-level import not at top (logger-before-imports pattern)
+    "F821",   # undefined name (forward references in type annotations)
+    "E501",   # line too long (long string literals in prompts, test data, error messages)
+]
+
+[lint.isort]
+known-first-party = ["app"]

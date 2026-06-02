@@ -1,0 +1,138 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for compose
+        run: |
+          echo "JWT_SECRET=ci-test-jwt-secret" > .env
+          echo "CREDENTIALS_ENCRYPTION_KEY=ci-test-encryption-key" >> .env
+          echo "POSTGRES_PASSWORD=delta" >> .env
+          echo "DELTA_DEV_MODE=1" >> .env
+          echo "SERVICE_TOKEN=ci-test-service-token" >> .env
+          echo "DELTA_CORS_ORIGINS=http://localhost:3001" >> .env
+
+      - name: Start services
+        run: docker compose up -d postgres pip-sidecar
+
+      - name: Build and start backend (with dev tools)
+        run: docker compose build --build-arg INCLUDE_DEV=1 backend && docker compose up -d backend --no-deps
+
+      - name: Wait for backend healthy
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+              echo "Backend is healthy"
+              break
+            fi
+            echo "Waiting for backend... ($i/30)"
+            sleep 2
+          done
+          if ! docker compose exec -T backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+            echo "ERROR: Backend did not become healthy within 60s"
+            docker compose logs backend --tail=20
+            exit 1
+          fi
+
+      - name: Lint with ruff
+        run: docker compose exec -T backend python3 -m ruff check --no-cache app/ tests/
+
+      - name: Check formatting with ruff
+        run: docker compose exec -T backend python3 -m ruff format --check --no-cache app/ tests/
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create .env for compose
+        run: |
+          echo "JWT_SECRET=ci-test-jwt-secret" > .env
+          echo "CREDENTIALS_ENCRYPTION_KEY=ci-test-encryption-key" >> .env
+          echo "POSTGRES_PASSWORD=delta" >> .env
+          echo "DELTA_DEV_MODE=1" >> .env
+          echo "SERVICE_TOKEN=ci-test-service-token" >> .env
+          echo "DELTA_CORS_ORIGINS=http://localhost:3001" >> .env
+
+      - name: Start services
+        run: docker compose up -d postgres pip-sidecar
+
+      - name: Build and start backend (with dev tools)
+        run: docker compose build --build-arg INCLUDE_DEV=1 backend && docker compose up -d backend --no-deps
+
+      - name: Wait for backend healthy
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+              echo "Backend is healthy"
+              break
+            fi
+            echo "Waiting for backend... ($i/30)"
+            sleep 2
+          done
+          if ! docker compose exec -T backend python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" 2>/dev/null; then
+            echo "ERROR: Backend did not become healthy within 60s"
+            docker compose logs backend --tail=20
+            exit 1
+          fi
+
+      - name: Run tests with coverage
+        run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage run -m pytest tests/ -v --ignore=tests/e2e --tb=short
+
+      - name: Coverage report
+        run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage report --include='app/*' --fail-under=55
+
+      - name: Generate coverage XML
+        run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage xml -o /tmp/coverage.xml
+
+      - name: Copy coverage XML from container
+        run: docker compose exec -T backend python3 -c "import sys; sys.stdout.write(open('/tmp/coverage.xml').read())" > ./coverage.xml
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
+
+  frontend-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npx vitest run

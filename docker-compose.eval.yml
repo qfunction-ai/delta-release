@@ -1,0 +1,48 @@
+# Eval runner — opt-in service for agent evaluation.
+# The eval service uses eval() for check expressions, which is an RCE risk.
+# It is excluded from the default stack to eliminate the standing attack surface.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d
+#
+# The backend's DELTA_EVAL_URL is already set to http://eval:8003.
+# When the eval service is not running, the health endpoint reports it as
+# "unreachable" with "optional": true — overall status is not degraded.
+
+services:
+  eval:
+    build:
+      context: .
+      dockerfile: eval/Dockerfile
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    environment:
+      - MOCK_AGENT=${MOCK_AGENT:-0}
+      - DELTA_EVAL_JUDGE_MODEL=${DELTA_EVAL_JUDGE_MODEL:-ollama/gemma4:latest}
+      - DELTA_EVAL_JUDGE_BASE_URL=${DELTA_EVAL_JUDGE_BASE_URL:-http://host.docker.internal:11434/v1}
+      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+    volumes:
+      - shared_config:/data/config:ro
+      - logs:/data/logs
+    depends_on:
+      letta:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - backend
+    restart: unless-stopped

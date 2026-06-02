@@ -1,0 +1,335 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - DELTA_DATABASE_URL=${DATABASE_URL:-postgresql://delta:delta@postgres:5432/delta}
+      - DELTA_LETTA_BASE_URL=http://letta:8283
+      - DELTA_BACKEND_URL=http://backend:8000
+      - DELTA_JWT_SECRET=${JWT_SECRET:-}
+      - DELTA_CREDENTIALS_ENCRYPTION_KEY=${CREDENTIALS_ENCRYPTION_KEY:-}
+      - DELTA_PIPSIDECAR_URL=http://pip-sidecar:8001
+      - DELTA_EVAL_URL=http://eval:8003
+      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+      - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-}
+      - DELTA_SETUP_TOKEN=${DELTA_SETUP_TOKEN:-}
+      - DELTA_DEV_MODE=${DELTA_DEV_MODE:-}
+      - EXA_API_KEY=${EXA_API_KEY:-}
+    volumes:
+      - shared_config:/data/config
+      - logs:/data/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      letta:
+        condition: service_healthy
+      pip-sidecar:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    networks:
+      - frontend
+      - backend
+      - data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+      - /var/cache/nginx:noexec,nosuid,size=16m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    ports:
+      - "127.0.0.1:3000:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: '0.25'
+    networks:
+      - frontend
+    restart: unless-stopped
+
+  postgres:
+    build:
+      context: ./postgres
+    # Port mapping removed — containers connect via Docker network.
+    # If you need host access for debugging, add it to docker-compose.override.yml
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-delta}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-delta}
+      - POSTGRES_DB=delta
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+      - logs:/data/logs
+    command: >
+      sh -c "mkdir -p /data/logs && chown 1000:1000 /data/logs &&
+             docker-entrypoint.sh postgres 2>&1 | tee /data/logs/postgres.log"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U delta -d delta"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - DAC_OVERRIDE
+      - FOWNER
+    networks:
+      - data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    user: "999:999"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.25'
+    networks:
+      - data
+    restart: unless-stopped
+
+  # Letta Local fork (ghcr.io/qfunction-ai/letta-local)
+  # Adds: audit log, tool call policies, canary checks, file persistence,
+  # prompt-based tool calling, and observability instrumentation.
+  # Uses external Postgres + Redis (no internal services).
+  # Runs as non-root (UID 1000) with no capabilities.
+  letta:
+    # Letta Local fork v0.16.11 (commit a5b2b39)
+    # Update: docker compose pull letta && docker compose up -d
+    image: ghcr.io/qfunction-ai/letta-local:latest
+    user: "1000:1000"
+    read_only: true
+    ports:
+      - "127.0.0.1:8283:8283"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
+      - DELTA_API_BASE_URL=http://backend:8000
+      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+      - EXA_API_KEY=${EXA_API_KEY:-}
+      # PYTHONPATH: /app needed because GHCR image's editable install has
+      # letta-0.16.8.dist-info but no .pth file pointing to /app.
+      # /extra-packages for pip-sidecar installed packages.
+      - PYTHONPATH=/app:/extra-packages
+      - PYTHONDONTWRITEBYTECODE=1
+      # Force DNS over TCP (Landlock sandbox blocks UDP; glibc reads
+      # RES_OPTIONS at resolver init). Replaces the old /etc/resolv.conf
+      # write in startup.sh which fails under read_only: true.
+      - RES_OPTIONS=use-vc
+      # Landlock sandbox: allow tools to make outbound TCP connections
+      # (e.g. CrowdStrike API, external data sources). Deny-by-default
+      # is the secure posture; this opts in for Delta's deployment.
+      - LETTA_LANDLOCK_ALLOW_TCP_CONNECT=true
+      # OpenTelemetry — send traces + metrics to the OTel Collector
+      - LETTA_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      # External Postgres + Redis (no internal services)
+      - LETTA_PG_URI=postgresql://${POSTGRES_USER:-delta}:${POSTGRES_PASSWORD:-delta}@postgres:5432/letta
+      - LETTA_REDIS_HOST=redis
+      - HOME=/home/letta
+      # LETTA_NO_DEFAULT_ACTOR: When true, requires a non-default user_id header
+      # on all API calls. Prevents silent fallback to default actor in multi-user
+      # setups (data leak vector). Disabled for now — Delta is single-user.
+      # Enable when multi-user support is added.
+      # - LETTA_NO_DEFAULT_ACTOR=true
+    volumes:
+      - letta_data:/home/letta/.letta
+      - extra_packages:/extra-packages
+      - logs:/data/logs
+    tmpfs:
+      - /tmp:noexec,nosuid,size=128m
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "./letta/server/startup.sh 2>&1 | tee /data/logs/letta.log"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8283/v1/health/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+    networks:
+      - backend
+      - data
+      - observability
+    restart: unless-stopped
+
+  pip-sidecar:
+    build:
+      context: .
+      dockerfile: pip-sidecar/Dockerfile
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+    volumes:
+      - extra_packages:/extra-packages
+      - shared_config:/data/config:ro
+      - logs:/data/logs
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - backend
+    restart: unless-stopped
+
+  # OpenTelemetry Collector — receives traces/metrics from Letta,
+  # exports to Jaeger (traces), Prometheus (metrics), and file (debug).
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    user: "1000:1000"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/config.yaml:ro
+      - otel_traces:/tmp
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+      - "127.0.0.1:8889:8889"   # Prometheus metrics endpoint
+    depends_on:
+      jaeger:
+        condition: service_started
+    # No healthcheck — the OTel Collector image is scratch-based (no shell,
+    # curl, wget). The health_check extension exposes http://localhost:13133/
+    # but we can't hit it from inside the container. The collector is
+    # stateless and self-restarts on crash (restart: unless-stopped).
+    # If we need health monitoring, switch to a non-scratch image variant.
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - observability
+    restart: unless-stopped
+
+  # Jaeger — trace visualization UI for dev.
+  # All-in-one image with OTLP receiver enabled.
+  # The collector sends traces to jaeger:4317 internally.
+  # Only the UI port is exposed on the host.
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+      - NET_BIND_SERVICE
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "127.0.0.1:16686:16686"  # Jaeger UI
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:16686/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    networks:
+      - observability
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  letta_data:
+  shared_config:
+  extra_packages:
+  logs:
+  otel_traces:
+
+networks:
+  frontend:
+  backend:
+  data:
+  observability:
