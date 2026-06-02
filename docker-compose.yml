@@ -24,7 +24,7 @@ services:
       - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
       - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-}
       - DELTA_SETUP_TOKEN=${DELTA_SETUP_TOKEN:-}
-      - DELTA_DEV_MODE=${DELTA_DEV_MODE:-}
+      - DELTA_DEV_MODE=${DELTA_DEV_MODE:-false}
       - EXA_API_KEY=${EXA_API_KEY:-}
     volumes:
       - shared_config:/data/config
