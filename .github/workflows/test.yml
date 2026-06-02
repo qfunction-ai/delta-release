@@ -25,6 +25,22 @@ jobs:
       - name: Start services
         run: docker compose up -d postgres pip-sidecar
 
+      - name: Wait for Postgres healthy
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U delta 2>/dev/null; then
+              echo "Postgres is ready"
+              break
+            fi
+            echo "Waiting for Postgres... ($i/30)"
+            sleep 2
+          done
+          if ! docker compose exec -T postgres pg_isready -U delta 2>/dev/null; then
+            echo "ERROR: Postgres did not become ready within 60s"
+            docker compose logs postgres --tail=20
+            exit 1
+          fi
+
       - name: Build and start backend (with dev tools)
         run: docker compose build --build-arg INCLUDE_DEV=1 backend && docker compose up -d backend --no-deps
 
@@ -71,6 +87,22 @@ jobs:
 
       - name: Start services
         run: docker compose up -d postgres pip-sidecar
+
+      - name: Wait for Postgres healthy
+        run: |
+          for i in $(seq 1 30); do
+            if docker compose exec -T postgres pg_isready -U delta 2>/dev/null; then
+              echo "Postgres is ready"
+              break
+            fi
+            echo "Waiting for Postgres... ($i/30)"
+            sleep 2
+          done
+          if ! docker compose exec -T postgres pg_isready -U delta 2>/dev/null; then
+            echo "ERROR: Postgres did not become ready within 60s"
+            docker compose logs postgres --tail=20
+            exit 1
+          fi
 
       - name: Build and start backend (with dev tools)
         run: docker compose build --build-arg INCLUDE_DEV=1 backend && docker compose up -d backend --no-deps
