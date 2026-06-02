@@ -22,6 +22,8 @@ def build_skill_prompt_prefix(skill_names: list[str]) -> str:
         f"2. If a skill references tools you do not have, say so — do not guess.\n"
         f"3. After completing all steps in a skill, report your findings.\n"
         f"4. For general questions unrelated to a skill, respond directly.\n"
+        f"5. NEVER stop mid-skill after a tool call returns. If a skill has multiple steps,\n"
+        f"   you MUST continue to the next step immediately. Do not summarize and stop.\n"
         f"\n"
     )
 
@@ -44,6 +46,7 @@ def build_skill_inline_block(skills: list, skill_files: dict[str, list] | None =
         block = (
             f"[Skill: {skill.name}]\n"
             f"Follow ALL steps below in order. Do not skip any step.\n"
+            f"After each tool call, immediately proceed to the next step — do NOT stop.\n"
             f"---\n"
             f"{content}\n"
             f"---\n"
