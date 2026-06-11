@@ -18,9 +18,6 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 logger = logging.getLogger(__name__)
 
-# Backward-compatible alias
-CYBERSECURITY_PERSONA = DEFAULT_PERSONA
-
 # Known embedding models with their dimensions
 KNOWN_EMBEDDING_MODELS = [
     {"id": "letta/letta-free", "name": "letta-free", "provider": "letta", "dimensions": 1536},
@@ -180,7 +177,7 @@ async def create_agent(
         model=agent_data.model,
         embedding=embedding_model,
         memory_blocks=[
-            {"label": "persona", "value": CYBERSECURITY_PERSONA},
+            {"label": "persona", "value": DEFAULT_PERSONA},
             {"label": "human", "value": f"Operator: {current_user.username}"},
             {"label": "workflow_context", "value": ""},
             {"label": "findings", "value": "[]"},
