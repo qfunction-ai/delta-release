@@ -58,9 +58,9 @@ export default function AgentSection() {
       {/* Agent Tool Creation Toggle */}
       <div className="card mb-6">
         <div className="flex items-center justify-between">
-          <div style={{ maxWidth: 'calc(100% - 80px)' }}>
-            <h3 style={{ margin: 0, marginBottom: '0.375rem' }}>Allow agents to propose tools</h3>
-            <p className="text-sm text-muted" style={{ margin: 0 }}>
+          <div className="toggle-card-description">
+            <h3 className="toggle-card-heading">Allow agents to propose tools</h3>
+            <p className="text-sm text-muted">
               When enabled, agents can draft new tools during conversations.
               Proposed tools require your approval before they can be used.
             </p>
@@ -83,9 +83,9 @@ export default function AgentSection() {
       {/* Web Search Toggle */}
       <div className="card mb-6">
         <div className="flex items-center justify-between">
-          <div style={{ maxWidth: 'calc(100% - 80px)' }}>
-            <h3 style={{ margin: 0, marginBottom: '0.375rem' }}>Allow agents to search the web</h3>
-            <p className="text-sm text-muted" style={{ margin: 0 }}>
+          <div className="toggle-card-description">
+            <h3 className="toggle-card-heading">Allow agents to search the web</h3>
+            <p className="text-sm text-muted">
               When enabled, agents can search the web for library documentation before proposing tools.
               Requires EXA_API_KEY to be configured.
             </p>
@@ -114,9 +114,9 @@ export default function AgentSection() {
       {/* Documentation Fetch Toggle */}
       <div className="card mb-6">
         <div className="flex items-center justify-between">
-          <div style={{ maxWidth: 'calc(100% - 80px)' }}>
-            <h3 style={{ margin: 0, marginBottom: '0.375rem' }}>Allow agents to fetch documentation</h3>
-            <p className="text-sm text-muted" style={{ margin: 0 }}>
+          <div className="toggle-card-description">
+            <h3 className="toggle-card-heading">Allow agents to fetch documentation</h3>
+            <p className="text-sm text-muted">
               When enabled, agents can fetch full documentation pages from allowed domains before proposing tools.
               This provides more detailed API references than web search snippets.
             </p>
