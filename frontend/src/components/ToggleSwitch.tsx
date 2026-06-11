@@ -38,7 +38,6 @@ export default function ToggleSwitch({ checked, onChange, disabled = false, 'ari
           borderRadius: 0,
           background: checked ? 'var(--accent)' : 'var(--text-tertiary)',
           transition: 'left 0.2s ease, background 0.2s ease',
-          boxShadow: checked ? '0 0 8px rgba(253, 176, 34, 0.4)' : 'none',
         }}
       />
     </button>

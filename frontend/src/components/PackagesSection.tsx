@@ -150,7 +150,7 @@ export default function PackagesSection() {
         </div>
       ) : packages.length === 0 ? (
         <div className="card">
-          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-body)' }}>
+          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-sans)' }}>
             No packages installed. Install one above to get started.
           </p>
         </div>

@@ -651,8 +651,8 @@ export default function Observability() {
 
   return (
     <div className="animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title-mockup" data-symbol="∇">OBSERVABILITY</h1>
+      <div className="page-header animate-entry">
+        <h1 className="page-title-mockup" data-symbol="∇">Observability</h1>
         <p className="page-subtitle-mockup">∇(events) → awareness</p>
       </div>
 
