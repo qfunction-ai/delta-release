@@ -155,7 +155,7 @@ export default function WorkflowForm({ agents, tools, skills, onCreated }: Workf
                     cursor: 'pointer',
                     fontSize: '0.8125rem',
                     color: selectedTools.includes(t.id) ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-mono)',
                     transition: 'all var(--transition-fast)',
                   }}
                 >
@@ -193,7 +193,7 @@ export default function WorkflowForm({ agents, tools, skills, onCreated }: Workf
                     cursor: 'pointer',
                     fontSize: '0.8125rem',
                     color: selectedSkills.includes(s.id) ? 'var(--accent)' : 'var(--text-secondary)',
-                    fontFamily: 'var(--font-display)',
+                    fontFamily: 'var(--font-mono)',
                     transition: 'all var(--transition-fast)',
                   }}
                 >

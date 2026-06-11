@@ -260,8 +260,8 @@ export default function Tools() {
   return (
     <div className="animate-fade-in">
       {/* Page header */}
-      <div className="page-header">
-        <h1 className="page-title-mockup" data-symbol="ƒ">TOOLS</h1>
+      <div className="page-header animate-entry">
+        <h1 className="page-title-mockup" data-symbol="ƒ">Tools</h1>
         <p className="page-subtitle-mockup">ƒ(tools) → ∪(actions) | define → attach → execute</p>
       </div>
 

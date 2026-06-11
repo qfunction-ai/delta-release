@@ -234,7 +234,7 @@ export default function CredentialsSection() {
         </div>
       ) : credentials.length === 0 ? (
         <div className="card">
-          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-body)' }}>
+          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-sans)' }}>
             No credentials stored. Add one above to get started.
           </p>
         </div>
@@ -251,7 +251,7 @@ export default function CredentialsSection() {
                     <h3
                       className="mb-4"
                       style={{
-                        fontFamily: 'var(--font-display)',
+                        fontFamily: 'var(--font-mono)',
                         fontSize: '1rem',
                         fontWeight: 600,
                         color: 'var(--text-primary)',
@@ -270,7 +270,7 @@ export default function CredentialsSection() {
                     </div>
 
                     <div className="mb-4">
-                      <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-body)' }}>
+                      <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-sans)' }}>
                         Type
                       </span>
                       <div className="flex items-center gap-4" style={{ marginTop: '0.25rem' }}>
@@ -280,7 +280,7 @@ export default function CredentialsSection() {
 
                     {credential.url && (
                       <div className="mb-4">
-                        <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-body)' }}>
+                        <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-sans)' }}>
                           URL
                         </span>
                         <p
@@ -324,7 +324,7 @@ export default function CredentialsSection() {
 
                     <p
                       className="text-xs text-tertiary mt-4"
-                      style={{ fontFamily: 'var(--font-body)' }}
+                      style={{ fontFamily: 'var(--font-sans)' }}
                     >
                       Updated {new Date(credential.updated_at).toLocaleString()}
                     </p>

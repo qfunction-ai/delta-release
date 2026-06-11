@@ -9,8 +9,8 @@ interface EncryptedFieldProps {
 export function EncryptedField({ label }: EncryptedFieldProps) {
   return (
     <div>
-      <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-body)' }}>{label}</span>
-      <p className="text-sm text-muted" style={{ marginTop: '0.25rem', fontFamily: 'var(--font-body)' }}>
+      <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-sans)' }}>{label}</span>
+      <p className="text-sm text-muted" style={{ marginTop: '0.25rem', fontFamily: 'var(--font-sans)' }}>
         <span style={{ opacity: 0.5, letterSpacing: '0.1em' }}>••••••••</span>
         <span className="text-xs text-tertiary" style={{ marginLeft: '0.5rem', verticalAlign: 'middle' }}>🔒 encrypted</span>
       </p>

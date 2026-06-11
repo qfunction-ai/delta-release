@@ -350,7 +350,7 @@ export default function Help() {
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header animate-entry">
         <h1 className="page-title">
           <span className="accent">?</span> Help
         </h1>

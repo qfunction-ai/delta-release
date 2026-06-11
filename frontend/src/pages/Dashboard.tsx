@@ -47,17 +47,17 @@ export default function Dashboard() {
   return (
     <div className="animate-fade-in">
       {/* Header */}
-      <div className="page-header">
-        <h1 className="page-title-mockup" data-symbol="Ω">DASHBOARD</h1>
+      <div className="page-header animate-entry">
+        <h1 className="page-title-mockup" data-symbol="Ω">Dashboard</h1>
         <p className="page-subtitle-mockup">f(x) = monitor → analyze → respond</p>
       </div>
 
       {/* Stats Grid (4 columns) */}
       <div className="stats-grid-4">
-        {statCards.map(({ key, label, formula, count, path }) => (
+        {statCards.map(({ key, label, formula, count, path }, i) => (
           <button
             key={key}
-            className="stat-card-mockup"
+            className={`stat-card-mockup animate-stagger stagger-${i + 1}`}
             onClick={() => navigate(path)}
             style={{ cursor: 'pointer', textAlign: 'left', width: '100%' }}
           >
@@ -73,9 +73,9 @@ export default function Dashboard() {
       </div>
 
       {/* Agent Fleet */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' }}>AGENT FLEET</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: 'var(--accent)', opacity: 0.5 }}>
+      <div className="animate-entry" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: '1rem', fontWeight: 600, color: 'var(--accent)' }}>Agent Fleet</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'var(--accent)', opacity: 0.5 }}>
           ∀ agents ∈ Ω
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function Dashboard() {
               <ConcentricCircles />
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem', position: 'relative', zIndex: 1 }}>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{agent.name}</div>
+                  <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-primary)' }}>{agent.name}</div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>{agent.model}</div>
                 </div>
                 <div style={{
@@ -113,21 +113,20 @@ export default function Dashboard() {
                   height: 8,
                   borderRadius: '50%',
                   background: agent.has_schedule ? 'var(--accent)' : 'var(--text-tertiary)',
-                  boxShadow: agent.has_schedule ? '0 0 10px rgba(253,176,34,0.5)' : 'none',
                 }} />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginTop: '1.25rem', position: 'relative', zIndex: 1 }}>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>⚡ Workflows</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem' }}>{agent.workflows_count}</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 400, color: 'var(--text-primary)', marginTop: '0.15rem' }}>{agent.workflows_count}</div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>📅 Scheduled</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: agent.has_schedule ? 'var(--success)' : 'var(--text-tertiary)', marginTop: '0.15rem' }}>{agent.has_schedule ? 'Yes' : 'No'}</div>
+                  <div style={{ fontFamily: 'var(--font-serif)', fontSize: '1.1rem', fontWeight: 400, color: agent.has_schedule ? 'var(--success)' : 'var(--text-tertiary)', marginTop: '0.15rem' }}>{agent.has_schedule ? 'Yes' : 'No'}</div>
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>🕐 Active</div>
-                  <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem' }}>{relativeTime(agent.last_activity)}</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9rem', fontWeight: 400, color: 'var(--text-primary)', marginTop: '0.15rem' }}>{relativeTime(agent.last_activity)}</div>
                 </div>
               </div>
             </div>
