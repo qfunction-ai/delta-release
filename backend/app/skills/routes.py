@@ -18,7 +18,6 @@ from app.skills.github_fetch import (
     extract_description_from_frontmatter,
     fetch_github_skill,
 )
-from app.utils import read_upload_with_limit
 from app.skills.importer import parse_skill_zip, persist_skill
 from app.skills.models import Skill, SkillFile, SkillTool
 from app.skills.schemas import (
@@ -29,6 +28,7 @@ from app.skills.schemas import (
     SkillResponse,
     SkillUpdate,
 )
+from app.utils import read_upload_with_limit
 
 logger = logging.getLogger(__name__)
 
