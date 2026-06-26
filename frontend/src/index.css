@@ -1852,6 +1852,115 @@ textarea.input {
   font-family: var(--font-mono);
 }
 
+/* === Message Avatars (Chat) === */
+.message-avatar {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.message-avatar.user {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.message-avatar.agent {
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+
+/* === Reasoning Block (Chat) === */
+.reasoning-block {
+  background: rgba(0, 217, 255, 0.03);
+  border: 1px solid rgba(0, 217, 255, 0.1);
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  position: relative;
+}
+
+.reasoning-label {
+  position: absolute;
+  top: -0.5rem;
+  left: 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--bg-primary);
+  padding: 0 0.25rem;
+}
+
+.reasoning-content {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+/* === Tool Call Block (Chat) === */
+.tool-call-block {
+  background: rgba(253, 176, 34, 0.03);
+  border: 1px solid var(--accent-border);
+  padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tool-call-icon {
+  color: var(--accent);
+}
+
+.tool-call-name {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--accent);
+}
+
+.tool-call-status {
+  color: var(--success);
+  font-size: 0.75rem;
+}
+
+/* === Typing Indicator === */
+.typing-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 0.5rem;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--text-tertiary);
+  border-radius: 50%;
+  animation: typing-pulse 1.4s infinite ease-in-out;
+}
+
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typing-pulse {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* === Message Meta === */
+.message-meta {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+}
+
 /* === Chat page (inline styles extracted) === */
 .chat-loading-container {
   display: flex;
