@@ -50,11 +50,7 @@ async def inject_skill_context(prompt: str, skills, db) -> str:
     if not skills:
         return prompt
     skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-    return (
-        build_skill_prompt_prefix([s.name for s in skills])
-        + build_skill_inline_block(skills, skill_files)
-        + prompt
-    )
+    return build_skill_prompt_prefix([s.name for s in skills]) + build_skill_inline_block(skills, skill_files) + prompt
 
 
 async def prepare_prompt_context(
