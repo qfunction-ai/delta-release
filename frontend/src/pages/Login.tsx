@@ -5,6 +5,7 @@ import { ERROR_MESSAGES } from '../lib/errors'
 import { validateRegistration } from './login.utils'
 import { useAuth } from '../hooks/useAuth'
 import { useApiFetch } from '../hooks/useApiFetch'
+import { CornerDecorations } from '../components/CornerDecorations'
 
 interface SetupStatus {
   needs_setup: boolean
@@ -96,7 +97,7 @@ export default function Login() {
   // Shared logo header
   const logoHeader = (
     <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-      <div style={{
+      <div className="font-mono" style={{
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -105,13 +106,11 @@ export default function Login() {
         borderRadius: 'var(--radius-md)',
         background: 'var(--accent-subtle)',
         border: '2px solid var(--accent)',
-        fontFamily: 'var(--font-display)',
         fontSize: '1.75rem',
         fontWeight: 700,
         color: 'var(--accent)',
         marginBottom: '1rem',
         position: 'relative',
-        boxShadow: '0 0 15px rgba(253, 176, 34, 0.3)',
       }}>
         Δ
         <div style={{
@@ -124,8 +123,7 @@ export default function Login() {
       <h1 style={{ fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
         <span style={{ color: 'var(--accent)' }}>Δ</span> delta
       </h1>
-      <div style={{
-        fontFamily: 'var(--font-display)',
+      <div className="font-mono" style={{
         fontSize: '0.6875rem',
         color: 'var(--text-tertiary)',
         letterSpacing: '0.1em',
@@ -134,8 +132,7 @@ export default function Login() {
       }}>
         QFunction
       </div>
-      <div style={{
-        fontFamily: 'var(--font-display)',
+      <div className="font-mono" style={{
         fontSize: '0.625rem',
         color: 'var(--text-tertiary)',
         letterSpacing: '0.05em',
@@ -151,20 +148,7 @@ export default function Login() {
   if (needsSetup) {
     return (
       <div className="login-page">
-        {/* Corner math symbols */}
-        <div style={{ position: 'fixed', top: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
-        <div style={{ position: 'fixed', top: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
-        <div style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
-        <div style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
-
-        {/* Lissajous curve decoration */}
-        <div style={{ position: 'fixed', top: '10%', right: '-5%', width: 500, height: 500, pointerEvents: 'none', zIndex: 0, opacity: 0.04 }}>
-          <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }} aria-hidden="true">
-            <path d="M 100 100 m -80 0 a 80 80 0 1 0 160 0 a 80 40 0 1 0 -160 0" fill="none" stroke="#FDB022" strokeWidth="0.3" opacity="0.5" />
-            <path d="M 20,100 C 20,20 180,20 180,100 C 180,180 20,180 20,100" fill="none" stroke="#FDB022" strokeWidth="0.2" opacity="0.3" />
-            <ellipse cx="100" cy="100" rx="70" ry="70" fill="none" stroke="#FDB022" strokeWidth="0.15" opacity="0.2" />
-          </svg>
-        </div>
+        <CornerDecorations />
 
         <div className="login-container">
           <div className="card" style={{ borderTop: '2px solid var(--accent)', padding: '2.5rem 2rem' }}>
@@ -242,20 +226,7 @@ export default function Login() {
   // Login form
   return (
     <div className="login-page">
-      {/* Corner math symbols */}
-      <div style={{ position: 'fixed', top: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
-      <div style={{ position: 'fixed', top: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
-      <div style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
-      <div style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
-
-      {/* Lissajous curve decoration */}
-      <div style={{ position: 'fixed', top: '10%', right: '-5%', width: 500, height: 500, pointerEvents: 'none', zIndex: 0, opacity: 0.04 }}>
-        <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" style={{ width: '100%', height: '100%' }} aria-hidden="true">
-          <path d="M 100 100 m -80 0 a 80 80 0 1 0 160 0 a 80 40 0 1 0 -160 0" fill="none" stroke="#FDB022" strokeWidth="0.3" opacity="0.5" />
-          <path d="M 20,100 C 20,20 180,20 180,100 C 180,180 20,180 20,100" fill="none" stroke="#FDB022" strokeWidth="0.2" opacity="0.3" />
-          <ellipse cx="100" cy="100" rx="70" ry="70" fill="none" stroke="#FDB022" strokeWidth="0.15" opacity="0.2" />
-        </svg>
-      </div>
+      <CornerDecorations />
 
       <div className="login-container">
         <div className="card" style={{ borderTop: '2px solid var(--accent)', padding: '2.5rem 2rem' }}>
@@ -278,7 +249,7 @@ export default function Login() {
       </div>
 
       {/* Version stamp */}
-      <div style={{ position: 'fixed', bottom: '1rem', right: '1.5rem', fontFamily: 'var(--font-display)', fontSize: '0.625rem', color: 'var(--text-tertiary)', opacity: 0.4, letterSpacing: '0.05em', zIndex: 1 }}>v0.1.0 // δ-build</div>
+      <div className="font-mono" style={{ position: 'fixed', bottom: '1rem', right: '1.5rem', fontSize: '0.625rem', color: 'var(--text-tertiary)', opacity: 0.4, letterSpacing: '0.05em', zIndex: 1 }}>v0.1.0 // δ-build</div>
     </div>
   )
 }
