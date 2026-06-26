@@ -96,7 +96,7 @@ export default function Login() {
   // Shared logo header
   const logoHeader = (
     <div style={{ textAlign: 'center', marginBottom: '2.5rem' }}>
-      <div style={{
+      <div className="font-mono" style={{
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -105,13 +105,11 @@ export default function Login() {
         borderRadius: 'var(--radius-md)',
         background: 'var(--accent-subtle)',
         border: '2px solid var(--accent)',
-        fontFamily: 'var(--font-display)',
         fontSize: '1.75rem',
         fontWeight: 700,
         color: 'var(--accent)',
         marginBottom: '1rem',
         position: 'relative',
-        boxShadow: '0 0 15px rgba(253, 176, 34, 0.3)',
       }}>
         Δ
         <div style={{
@@ -124,8 +122,7 @@ export default function Login() {
       <h1 style={{ fontSize: '1.75rem', letterSpacing: '-0.02em' }}>
         <span style={{ color: 'var(--accent)' }}>Δ</span> delta
       </h1>
-      <div style={{
-        fontFamily: 'var(--font-display)',
+      <div className="font-mono" style={{
         fontSize: '0.6875rem',
         color: 'var(--text-tertiary)',
         letterSpacing: '0.1em',
@@ -134,8 +131,7 @@ export default function Login() {
       }}>
         QFunction
       </div>
-      <div style={{
-        fontFamily: 'var(--font-display)',
+      <div className="font-mono" style={{
         fontSize: '0.625rem',
         color: 'var(--text-tertiary)',
         letterSpacing: '0.05em',
@@ -152,10 +148,10 @@ export default function Login() {
     return (
       <div className="login-page">
         {/* Corner math symbols */}
-        <div style={{ position: 'fixed', top: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
-        <div style={{ position: 'fixed', top: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
-        <div style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
-        <div style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
+        <div className="font-mono" style={{ position: 'fixed', top: '-1rem', left: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
+        <div className="font-mono" style={{ position: 'fixed', top: '-1rem', right: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
+        <div className="font-mono" style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
+        <div className="font-mono" style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
 
         {/* Lissajous curve decoration */}
         <div style={{ position: 'fixed', top: '10%', right: '-5%', width: 500, height: 500, pointerEvents: 'none', zIndex: 0, opacity: 0.04 }}>
@@ -243,10 +239,10 @@ export default function Login() {
   return (
     <div className="login-page">
       {/* Corner math symbols */}
-      <div style={{ position: 'fixed', top: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
-      <div style={{ position: 'fixed', top: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
-      <div style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
-      <div style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', fontFamily: 'var(--font-display)', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
+      <div className="font-mono" style={{ position: 'fixed', top: '-1rem', left: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>λ</div>
+      <div className="font-mono" style={{ position: 'fixed', top: '-1rem', right: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>Σ</div>
+      <div className="font-mono" style={{ position: 'fixed', bottom: '-1rem', left: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∫</div>
+      <div className="font-mono" style={{ position: 'fixed', bottom: '-1rem', right: '1.5rem', color: 'rgba(253,176,34,0.06)', fontSize: '6rem', fontWeight: 300, pointerEvents: 'none', zIndex: 0, lineHeight: 1 }}>∞</div>
 
       {/* Lissajous curve decoration */}
       <div style={{ position: 'fixed', top: '10%', right: '-5%', width: 500, height: 500, pointerEvents: 'none', zIndex: 0, opacity: 0.04 }}>
@@ -278,7 +274,7 @@ export default function Login() {
       </div>
 
       {/* Version stamp */}
-      <div style={{ position: 'fixed', bottom: '1rem', right: '1.5rem', fontFamily: 'var(--font-display)', fontSize: '0.625rem', color: 'var(--text-tertiary)', opacity: 0.4, letterSpacing: '0.05em', zIndex: 1 }}>v0.1.0 // δ-build</div>
+      <div className="font-mono" style={{ position: 'fixed', bottom: '1rem', right: '1.5rem', fontSize: '0.625rem', color: 'var(--text-tertiary)', opacity: 0.4, letterSpacing: '0.05em', zIndex: 1 }}>v0.1.0 // δ-build</div>
     </div>
   )
 }

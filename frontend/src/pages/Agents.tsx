@@ -166,9 +166,9 @@ export default function Agents() {
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header animate-entry">
         <div>
-          <h1 className="page-title-mockup" data-symbol="∈">AGENTS</h1>
+          <h1 className="page-title-mockup" data-symbol="∈">Agents</h1>
           <p className="page-subtitle-mockup">∀ a ∈ Agents : monitor(a) → Δ(state)</p>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function Agents() {
           background: 'rgba(251, 191, 36, 0.1)',
           border: '1px solid rgba(251, 191, 36, 0.3)',
           marginBottom: '1rem',
-          fontFamily: 'var(--font-display)',
+          fontFamily: 'var(--font-sans)',
           fontSize: '0.75rem',
           color: '#FDB022',
           display: 'flex',
@@ -199,7 +199,7 @@ export default function Agents() {
           <span className="section-header" data-symbol="+">Create Agent</span>
         </summary>
         <div className="card agent-create-card">
-          <form onSubmit={handleCreate} style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <form onSubmit={handleCreate} className="flex gap-3" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: '1 1 200px', marginBottom: 0 }}>
               <label className="form-label" htmlFor="field-agents-name">Name</label>
               <input
@@ -399,11 +399,11 @@ export default function Agents() {
                 </div>
                 <div className="detail-cell">
                   <div className="detail-cell-label">Agent ID</div>
-                  <div className="detail-cell-value" style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', wordBreak: 'break-all' }}>{viewingAgent.id}</div>
+                  <div className="detail-cell-value detail-id">{viewingAgent.id}</div>
                 </div>
                 <div className="detail-cell">
                   <div className="detail-cell-label">Letta ID</div>
-                  <div className="detail-cell-value" style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', wordBreak: 'break-all' }}>{viewingAgent.letta_agent_id}</div>
+                  <div className="detail-cell-value detail-id">{viewingAgent.letta_agent_id}</div>
                 </div>
                 <div className="detail-cell">
                   <div className="detail-cell-label">Created</div>

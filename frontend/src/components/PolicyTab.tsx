@@ -211,9 +211,9 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Tools that are always blocked by the security policy.</p>
 
         {policy.denied_tools.length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
             {policy.denied_tools.map(tool => (
-              <div key={tool} className="flex items-center justify-between" style={{ padding: '0.375rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div key={tool} className="flex items-center justify-between policy-list-item">
                 <span className="font-mono text-sm">{tool}</span>
                 <button className="btn btn-danger btn-sm" onClick={() => removeDeniedTool(tool)} disabled={saving}>Remove</button>
               </div>
@@ -244,9 +244,9 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Tools that require human approval before execution.</p>
 
         {policy.approval_required_tools.length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
             {policy.approval_required_tools.map(tool => (
-              <div key={tool} className="flex items-center justify-between" style={{ padding: '0.375rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div key={tool} className="flex items-center justify-between policy-list-item">
                 <span className="font-mono text-sm">{tool}</span>
                 <button className="btn btn-danger btn-sm" onClick={() => removeApprovalTool(tool)} disabled={saving}>Remove</button>
               </div>
@@ -381,9 +381,9 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Per-tool per-run call limits. Overrides the global default.</p>
 
         {Object.keys(policy.max_calls_per_tool).length > 0 ? (
-          <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
             {Object.entries(policy.max_calls_per_tool).map(([tool, limit]) => (
-              <div key={tool} className="flex items-center justify-between" style={{ padding: '0.375rem 0.75rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-sm)' }}>
+              <div key={tool} className="flex items-center justify-between policy-list-item">
                 <span className="font-mono text-sm">{tool}</span>
                 <div className="flex items-center gap-2">
                   <span className="badge badge-info">{limit} calls/run</span>
@@ -467,7 +467,7 @@ export default function PolicyTab({ agentId }: Props) {
         <h3 className="section-header" data-symbol="?">Evaluate</h3>
         <p className="text-sm text-muted mb-4">Dry-run a tool call against the current policy without executing it.</p>
 
-        <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+        <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
           <input
             type="text"
             className="input"
@@ -479,14 +479,14 @@ export default function PolicyTab({ agentId }: Props) {
             disabled={evaluating}
           />
           <textarea
-            className="input"
+            className="input font-mono"
             placeholder='Tool arguments (JSON, e.g. {"query": "test"})'
             aria-label="Tool arguments (JSON)"
             value={evalToolArgs}
             onChange={e => setEvalToolArgs(e.target.value)}
             rows={3}
             disabled={evaluating}
-            style={{ fontFamily: 'var(--font-mono)', fontSize: '0.8rem', resize: 'vertical' }}
+            style={{ fontSize: '0.8rem', resize: 'vertical' }}
           />
           <button className="btn btn-primary" onClick={evaluate} disabled={evaluating || !evalToolName.trim()}>
             {evaluating ? 'Evaluating...' : 'Evaluate'}

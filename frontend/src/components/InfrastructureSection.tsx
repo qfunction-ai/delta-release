@@ -64,10 +64,10 @@ export default function InfrastructureSection() {
       {/* Section header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <div>
-          <h3 style={{ fontFamily: 'var(--font-sans)', fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+          <h3 className="font-sans" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
             Service Infrastructure
           </h3>
-          <p style={{ fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
+          <p className="font-sans" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
             Connectivity status for all dependent services
           </p>
         </div>
@@ -92,12 +92,10 @@ export default function InfrastructureSection() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
           {/* Overall status banner */}
           <div
-            className={health.status === 'healthy' ? 'badge-success' : 'badge-warning'}
+            className={`${health.status === 'healthy' ? 'badge-success' : 'badge-warning'} font-mono`}
             style={{
               padding: '0.625rem 1rem',
               borderRadius: 'var(--radius-md)',
-              fontFamily: 'var(--font-mono)',
-              fontSize: '0.75rem',
               letterSpacing: '0.02em',
             }}
           >
@@ -113,14 +111,14 @@ export default function InfrastructureSection() {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                 <StatusDot status={svc.status} />
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                <span className="font-sans" style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                   {SERVICE_LABELS[name] || name}
                 </span>
                 {svc.optional && (
                   <span className="badge badge-idle">optional</span>
                 )}
-                <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
-                  className={`health-status ${svc.status}`}
+                <span style={{ marginLeft: 'auto', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                  className={`health-status ${svc.status} font-mono`}
                 >
                   {svc.status}
                 </span>
@@ -129,7 +127,7 @@ export default function InfrastructureSection() {
               {/* Status detail */}
               <div style={{ marginTop: '0.5rem', paddingLeft: '1.375rem' }}>
                 {svc.status === 'healthy' && (
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  <span className="service-status-text healthy">
                     Healthy
                     {svc.version && (
                       <span style={{ marginLeft: '0.5rem', color: 'var(--text-tertiary)' }}>
@@ -139,12 +137,12 @@ export default function InfrastructureSection() {
                   </span>
                 )}
                 {svc.status === 'unhealthy' && (
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--danger)' }}>
+                  <span className="service-status-text unhealthy">
                     Unhealthy (HTTP {svc.status_code})
                   </span>
                 )}
                 {svc.status === 'unreachable' && (
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--danger)' }}>
+                  <span className="service-status-text unreachable">
                     Unreachable — service is not responding
                   </span>
                 )}
@@ -162,7 +160,7 @@ export default function InfrastructureSection() {
 
                 {/* Error message */}
                 {svc.error && (
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', color: 'var(--danger)', marginTop: '0.375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div className="font-mono" style={{ fontSize: '0.6875rem', color: 'var(--danger)', marginTop: '0.375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {svc.error}
                   </div>
                 )}
@@ -174,7 +172,7 @@ export default function InfrastructureSection() {
 
       {/* Loading state */}
       {!health && !error && loading && (
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+        <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
           Checking services...
         </div>
       )}

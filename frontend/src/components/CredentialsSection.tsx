@@ -229,12 +229,12 @@ export default function CredentialsSection() {
       </h2>
 
       {credLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+        <div className="loading-center">
           <LoadingSpinner />
         </div>
       ) : credentials.length === 0 ? (
         <div className="card">
-          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-body)' }}>
+          <p className="text-sm text-muted font-sans">
             No credentials stored. Add one above to get started.
           </p>
         </div>
@@ -248,15 +248,7 @@ export default function CredentialsSection() {
               <div key={credential.id} className="card animate-fade-in">
                 <div className="flex items-center justify-between">
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <h3
-                      className="mb-4"
-                      style={{
-                        fontFamily: 'var(--font-display)',
-                        fontSize: '1rem',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                      }}
-                    >
+                    <h3 className="mb-4 font-mono" style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {credential.name}
                     </h3>
 
@@ -270,7 +262,7 @@ export default function CredentialsSection() {
                     </div>
 
                     <div className="mb-4">
-                      <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-body)' }}>
+                      <span className="text-xs text-tertiary font-sans">
                         Type
                       </span>
                       <div className="flex items-center gap-4" style={{ marginTop: '0.25rem' }}>
@@ -280,7 +272,7 @@ export default function CredentialsSection() {
 
                     {credential.url && (
                       <div className="mb-4">
-                        <span className="text-xs text-tertiary" style={{ fontFamily: 'var(--font-body)' }}>
+                        <span className="text-xs text-tertiary font-sans">
                           URL
                         </span>
                         <p
@@ -322,15 +314,12 @@ export default function CredentialsSection() {
                       </div>
                     )}
 
-                    <p
-                      className="text-xs text-tertiary mt-4"
-                      style={{ fontFamily: 'var(--font-body)' }}
-                    >
+                    <p className="text-xs text-tertiary mt-4 font-sans">
                       Updated {new Date(credential.updated_at).toLocaleString()}
                     </p>
                   </div>
 
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem', marginLeft: '1.5rem', flexShrink: 0 }}>
+                  <div className="item-actions-col">
                     <button
                       className="btn btn-danger btn-sm"
                       onClick={() => handleDeleteCredential(credential.id, credential.name)}
