@@ -15,7 +15,7 @@ export default function Settings() {
     <div className="animate-fade-in">
       {/* Page Header */}
       <div className="page-header animate-entry">
-        <h1 className="page-title-mockup" data-symbol="⚙">Settings</h1>
+        <h1 className="page-title-mockup" data-symbol="⚙">SETTINGS</h1>
         <p className="page-subtitle-mockup">configure(Δ) → optimize(runtime)</p>
       </div>
 
