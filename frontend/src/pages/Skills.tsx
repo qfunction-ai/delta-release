@@ -209,8 +209,8 @@ export default function Skills() {
   return (
     <div className="animate-fade-in">
       {/* Page Header */}
-      <div className="page-header">
-        <h1 className="page-title-mockup" data-symbol="σ">SKILLS</h1>
+      <div className="page-header animate-entry">
+        <h1 className="page-title-mockup" data-symbol="σ">Skills</h1>
         <p className="page-subtitle-mockup">σ(skills) → ∪(capabilities) | attach → execute</p>
       </div>
 
@@ -549,7 +549,7 @@ export default function Skills() {
 
           {!viewingSkill && (
             <div className="card">
-              <div className="skills-empty-state">
+              <div className="empty-state">
                 <p className="text-muted text-sm skills-empty-hint">
                   Select a skill to inspect its contents.
                 </p>

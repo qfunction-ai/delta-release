@@ -308,7 +308,7 @@ function RunsTab() {
       </div>
 
       {runs.length === 0 ? (
-        <div className="obs-empty-state">No runs found</div>
+        <div className="empty-state">No runs found</div>
       ) : (
         <div className="row-list">
           {runs.map(run => (
@@ -486,7 +486,7 @@ function ToolCallsTab() {
       </div>
 
       {calls.length === 0 ? (
-        <div className="obs-empty-state">No tool calls found</div>
+        <div className="empty-state">No tool calls found</div>
       ) : (
         <table className="obs-table">
           <thead>
@@ -595,7 +595,7 @@ function SecurityTab() {
       </div>
 
       {events.length === 0 ? (
-        <div className="obs-empty-state">No security events found</div>
+        <div className="empty-state">No security events found</div>
       ) : (
         <table className="obs-table">
           <thead>
@@ -651,8 +651,8 @@ export default function Observability() {
 
   return (
     <div className="animate-fade-in">
-      <div className="page-header">
-        <h1 className="page-title-mockup" data-symbol="∇">OBSERVABILITY</h1>
+      <div className="page-header animate-entry">
+        <h1 className="page-title-mockup" data-symbol="∇">Observability</h1>
         <p className="page-subtitle-mockup">∇(events) → awareness</p>
       </div>
 
