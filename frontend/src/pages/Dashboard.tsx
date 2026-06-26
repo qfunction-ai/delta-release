@@ -38,10 +38,10 @@ export default function Dashboard() {
   if (!data) return <LoadingSpinner />
 
   const statCards = [
-    { key: 'agents', label: 'Active Agents', formula: 'Σ(status = active)', count: data.stats.agents, path: '/agents' },
-    { key: 'tools', label: 'Tools Available', formula: '|T| where enabled = true', count: data.stats.tools, path: '/tools' },
-    { key: 'skills', label: 'Skills Loaded', formula: '|S| ∈ agent.skills', count: data.stats.skills, path: '/skills' },
-    { key: 'workflows', label: 'Workflows', formula: '∫[t₀→t₁] W dt', count: data.stats.workflows, path: '/workflows' },
+    { key: 'agents', label: 'Active Agents', count: data.stats.agents, path: '/agents' },
+    { key: 'tools', label: 'Tools Available', count: data.stats.tools, path: '/tools' },
+    { key: 'skills', label: 'Skills Loaded', count: data.stats.skills, path: '/skills' },
+    { key: 'workflows', label: 'Workflows', count: data.stats.workflows, path: '/workflows' },
   ]
 
   return (
@@ -54,7 +54,7 @@ export default function Dashboard() {
 
       {/* Stats Grid (4 columns) */}
       <div className="stats-grid-4">
-        {statCards.map(({ key, label, formula, count, path }) => (
+        {statCards.map(({ key, label, count, path }) => (
           <button
             key={key}
             className="stat-card-mockup"
@@ -65,9 +65,6 @@ export default function Dashboard() {
             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: '0.5rem' }}>
               <div className="stat-value-mockup" style={{ color: 'var(--accent)' }}>{count}</div>
             </div>
-            <div className="stat-formula" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' }}>
-              <code>{formula}</code>
-            </div>
           </button>
         ))}
       </div>
@@ -75,9 +72,6 @@ export default function Dashboard() {
       {/* Agent Fleet */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 700, color: 'var(--accent)' }}>AGENT FLEET</div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.8rem', color: 'var(--accent)', opacity: 0.5 }}>
-          ∀ agents ∈ Ω
-        </div>
       </div>
 
       {data.agents.length === 0 ? (
