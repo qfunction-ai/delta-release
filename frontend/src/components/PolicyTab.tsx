@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch, extractApiError } from '../lib/api'
 import { LoadingSpinner } from './LoadingSpinner'
+import { PolicyList } from './PolicyList'
 import type { ToolCallPolicy, PolicyRule, PolicyDecision } from '../lib/types'
 
 const ACTIONS = ['allow', 'deny', 'require_approval', 'audit'] as const
@@ -211,14 +212,11 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Tools that are always blocked by the security policy.</p>
 
         {policy.denied_tools.length > 0 ? (
-          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
-            {policy.denied_tools.map(tool => (
-              <div key={tool} className="flex items-center justify-between policy-list-item">
-                <span className="font-mono text-sm">{tool}</span>
-                <button className="btn btn-danger btn-sm" onClick={() => removeDeniedTool(tool)} disabled={saving}>Remove</button>
-              </div>
-            ))}
-          </div>
+          <PolicyList
+            items={policy.denied_tools.map(tool => ({ key: tool, label: tool }))}
+            onRemove={removeDeniedTool}
+            disabled={saving}
+          />
         ) : (
           <p className="text-sm text-muted mb-4">No denied tools. All tools are allowed by default.</p>
         )}
@@ -244,14 +242,11 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Tools that require human approval before execution.</p>
 
         {policy.approval_required_tools.length > 0 ? (
-          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
-            {policy.approval_required_tools.map(tool => (
-              <div key={tool} className="flex items-center justify-between policy-list-item">
-                <span className="font-mono text-sm">{tool}</span>
-                <button className="btn btn-danger btn-sm" onClick={() => removeApprovalTool(tool)} disabled={saving}>Remove</button>
-              </div>
-            ))}
-          </div>
+          <PolicyList
+            items={policy.approval_required_tools.map(tool => ({ key: tool, label: tool }))}
+            onRemove={removeApprovalTool}
+            disabled={saving}
+          />
         ) : (
           <p className="text-sm text-muted mb-4">No tools require approval.</p>
         )}
@@ -381,17 +376,15 @@ export default function PolicyTab({ agentId }: Props) {
         <p className="text-sm text-muted mb-4">Per-tool per-run call limits. Overrides the global default.</p>
 
         {Object.keys(policy.max_calls_per_tool).length > 0 ? (
-          <div className="gap-2" style={{ display: 'grid', marginBottom: '1rem' }}>
-            {Object.entries(policy.max_calls_per_tool).map(([tool, limit]) => (
-              <div key={tool} className="flex items-center justify-between policy-list-item">
-                <span className="font-mono text-sm">{tool}</span>
-                <div className="flex items-center gap-2">
-                  <span className="badge badge-info">{limit} calls/run</span>
-                  <button className="btn btn-danger btn-sm" onClick={() => removeRateLimit(tool)} disabled={saving}>Remove</button>
-                </div>
-              </div>
-            ))}
-          </div>
+          <PolicyList
+            items={Object.entries(policy.max_calls_per_tool).map(([tool, limit]) => ({
+              key: tool,
+              label: tool,
+              badge: <span className="badge badge-info">{limit} calls/run</span>,
+            }))}
+            onRemove={removeRateLimit}
+            disabled={saving}
+          />
         ) : (
           <p className="text-sm text-muted mb-4">No per-tool rate limits configured.</p>
         )}
