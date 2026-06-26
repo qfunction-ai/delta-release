@@ -41,6 +41,18 @@ async def _fetch_skill_files(skill_ids: list[str], db) -> dict[str, list[tuple[s
     return result
 
 
+async def inject_skill_context(prompt: str, skills, db) -> str:
+    """Prepend skill prompt prefix and inline content to a prompt/message.
+
+    Shared by workflow creation, workflow updates, workflow run prep,
+    and chat run prep. Returns the prompt with skill context prepended.
+    """
+    if not skills:
+        return prompt
+    skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
+    return build_skill_prompt_prefix([s.name for s in skills]) + build_skill_inline_block(skills, skill_files) + prompt
+
+
 async def prepare_prompt_context(
     workflow: Workflow,
     agent_id: str,
@@ -69,12 +81,7 @@ async def prepare_prompt_context(
             await ensure_archival_memory_search(client, agent_id)
             await insert_skills_into_archival_memory(agent_id, skills, client, db=db)
             # Fetch skill files and inject everything directly into the prompt
-            skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-            prompt = (
-                build_skill_prompt_prefix([s.name for s in skills])
-                + build_skill_inline_block(skills, skill_files)
-                + prompt
-            )
+            prompt = await inject_skill_context(prompt, skills, db)
 
     # Insert lessons from past runs into archival memory
     lessons = await get_lessons_for_workflow(str(workflow.id), db)
@@ -205,11 +212,6 @@ async def prepare_chat_run(
         await ensure_archival_memory_search(client, agent_id)
         await insert_skills_into_archival_memory(agent_id, skills, client, db=db)
         # Fetch skill files and inject everything directly into the message
-        skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-        rendered_message = (
-            build_skill_prompt_prefix([s.name for s in skills])
-            + build_skill_inline_block(skills, skill_files)
-            + rendered_message
-        )
+        rendered_message = await inject_skill_context(rendered_message, skills, db)
 
     return rendered_message, client

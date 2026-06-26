@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
-from app.constants import UPLOAD_CHUNK_SIZE
 from app.database import get_db, list_owned
 from app.rate_limit import limiter
 from app.sanitize import validate_tool_source_code
@@ -18,6 +17,7 @@ from app.skills.models import Skill, SkillFile
 from app.tools.helpers import register_and_store_tool
 from app.tools.models import Tool
 from app.tools.schemas import ToolCreate
+from app.utils import read_upload_with_limit
 from app.workflows.models import Workflow
 
 from .schemas import ExportData, ExportDataValidator, ImportResult, ToolExport, WorkflowExport
@@ -331,21 +331,7 @@ async def import_all(
     result = ImportResult()
 
     # Read and validate file
-    chunks = []
-    total_size = 0
-    while True:
-        chunk = await file.read(UPLOAD_CHUNK_SIZE)
-        if not chunk:
-            break
-        total_size += len(chunk)
-        if total_size > MAX_IMPORT_SIZE:
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Import file too large. Maximum size is {MAX_IMPORT_SIZE // (1024 * 1024)}MB.",
-            )
-        chunks.append(chunk)
-
-    content = b"".join(chunks)
+    content = await read_upload_with_limit(file, MAX_IMPORT_SIZE)
 
     content_type = (file.content_type or "").lower()
     if content_type and content_type not in ("application/json", "text/plain", "application/octet-stream"):

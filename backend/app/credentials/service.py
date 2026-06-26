@@ -17,6 +17,22 @@ from app.letta_client import get_letta_client
 logger = logging.getLogger(__name__)
 
 
+def _credential_to_env_var(cred: Credential) -> tuple[str, str]:
+    """Decrypt a credential and build the CREDENTIAL_<key> env var pair.
+
+    Returns (env_var_name, json_value) where json_value contains
+    primary_key, secondary_key, and url fields.
+    """
+    value = json.dumps(
+        {
+            "primary_key": decrypt_value(cred.primary_key_encrypted),
+            "secondary_key": decrypt_value(cred.secondary_key_encrypted) if cred.secondary_key_encrypted else None,
+            "url": cred.url,
+        }
+    )
+    return f"CREDENTIAL_{cred.key}", value
+
+
 async def build_credential_secrets_dict(user_id: str, db: AsyncSession) -> dict[str, str]:
     """Build a dict of CREDENTIAL_<key> → JSON value for all of a user's credentials.
 
@@ -28,14 +44,8 @@ async def build_credential_secrets_dict(user_id: str, db: AsyncSession) -> dict[
 
     secrets = {}
     for cred in credentials:
-        value = json.dumps(
-            {
-                "primary_key": decrypt_value(cred.primary_key_encrypted),
-                "secondary_key": decrypt_value(cred.secondary_key_encrypted) if cred.secondary_key_encrypted else None,
-                "url": cred.url,
-            }
-        )
-        secrets[f"CREDENTIAL_{cred.key}"] = value
+        key, value = _credential_to_env_var(cred)
+        secrets[key] = value
 
     return secrets
 
@@ -77,16 +87,8 @@ async def sync_credential_secrets(user_id: str, db: AsyncSession) -> dict[str, s
             # immediately after the API call.
             cred_secrets = {}
             for cred in credentials:
-                value = json.dumps(
-                    {
-                        "primary_key": decrypt_value(cred.primary_key_encrypted),
-                        "secondary_key": decrypt_value(cred.secondary_key_encrypted)
-                        if cred.secondary_key_encrypted
-                        else None,
-                        "url": cred.url,
-                    }
-                )
-                cred_secrets[f"CREDENTIAL_{cred.key}"] = value
+                key, value = _credential_to_env_var(cred)
+                cred_secrets[key] = value
 
             try:
                 letta_agent = await run_sync(client.agents.retrieve, agent.letta_agent_id)

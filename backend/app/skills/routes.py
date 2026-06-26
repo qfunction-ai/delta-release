@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
 from app.config import get_settings
-from app.constants import UPLOAD_CHUNK_SIZE
 from app.database import check_unique_for_user, get_db, get_owned_or_404, list_owned
 from app.errors import sanitize_error_detail
 from app.github import build_github_headers, parse_github_url
@@ -29,6 +28,7 @@ from app.skills.schemas import (
     SkillResponse,
     SkillUpdate,
 )
+from app.utils import read_upload_with_limit
 
 logger = logging.getLogger(__name__)
 
@@ -137,21 +137,7 @@ async def upload_skill(
 ):
     """Upload a zipped skill directory (.zip or .skill file)."""
     settings = get_settings()
-    # Read the file in chunks to prevent memory exhaustion
-    chunks = []
-    total_size = 0
-    while True:
-        chunk = await file.read(UPLOAD_CHUNK_SIZE)
-        if not chunk:
-            break
-        total_size += len(chunk)
-        if total_size > settings.max_upload_size:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"File too large. Maximum size is {settings.max_upload_size // (1024 * 1024)}MB",
-            )
-        chunks.append(chunk)
-    zip_bytes = b"".join(chunks)
+    zip_bytes = await read_upload_with_limit(file, settings.max_upload_size)
 
     try:
         name, description, skill_content, extra_files = parse_skill_zip(zip_bytes)

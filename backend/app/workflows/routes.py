@@ -9,8 +9,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.models import Agent
-from app.agents.prompts import build_skill_inline_block, build_skill_prompt_prefix, extract_message_parts
-from app.agents.run_prep import prepare_workflow_run
+from app.agents.prompts import extract_message_parts
+from app.agents.run_prep import inject_skill_context, prepare_workflow_run
 from app.agents.skills import get_skills_by_ids
 from app.async_utils import event_to_sse, retry_letta_call, sse_response, stream_letta_response
 from app.auth.dependencies import get_current_user
@@ -128,15 +128,7 @@ async def create_workflow(
         if workflow_data.skill_ids:
             skills = await get_skills_by_ids([str(sid) for sid in workflow_data.skill_ids], str(current_user.id), db)
             if skills:
-                skill_names = [s.name for s in skills]
-                from app.agents.run_prep import _fetch_skill_files
-
-                skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-                scheduled_prompt = (
-                    build_skill_prompt_prefix(skill_names)
-                    + build_skill_inline_block(skills, skill_files)
-                    + scheduled_prompt
-                )
+                scheduled_prompt = await inject_skill_context(scheduled_prompt, skills, db)
 
         try:
             await schedule_workflow(
@@ -217,15 +209,7 @@ async def update_workflow(
             if skill_ids:
                 skills = await get_skills_by_ids(skill_ids, str(current_user.id), db)
                 if skills:
-                    skill_names = [s.name for s in skills]
-                    from app.agents.run_prep import _fetch_skill_files
-
-                    skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-                    scheduled_prompt = (
-                        build_skill_prompt_prefix(skill_names)
-                        + build_skill_inline_block(skills, skill_files)
-                        + scheduled_prompt
-                    )
+                    scheduled_prompt = await inject_skill_context(scheduled_prompt, skills, db)
 
             try:
                 await schedule_workflow(

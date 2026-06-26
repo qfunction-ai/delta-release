@@ -37,6 +37,12 @@ _TRACE_ID_RE = re.compile(r"^[0-9a-f]{16,32}$", re.IGNORECASE)
 _LETTA_ID_RE = re.compile(r"^[a-z]+-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
 
 
+def _validate_letta_id(id_value: str, label: str = "run") -> None:
+    """Validate that an ID matches the Letta ID format. Raises 400 if not."""
+    if not _LETTA_ID_RE.match(id_value):
+        raise HTTPException(status_code=400, detail=f"Invalid {label} ID format")
+
+
 async def _proxy_get(path: str, params: dict | None = None) -> dict:
     """GET a JSON response from the Letta API. Returns parsed JSON or raises."""
     base_url = letta_base_url()
@@ -114,8 +120,7 @@ async def get_run(
     current_user: User = Depends(get_admin_user),
 ):
     """Get a single run."""
-    if not _LETTA_ID_RE.match(run_id):
-        raise HTTPException(status_code=400, detail="Invalid run ID format")
+    _validate_letta_id(run_id)
     return await _proxy_get(f"/v1/runs/{run_id}")
 
 
@@ -127,8 +132,7 @@ async def list_run_steps(
     current_user: User = Depends(get_admin_user),
 ):
     """List steps for a run."""
-    if not _LETTA_ID_RE.match(run_id):
-        raise HTTPException(status_code=400, detail="Invalid run ID format")
+    _validate_letta_id(run_id)
     return await _proxy_get(f"/v1/runs/{run_id}/steps", {"limit": limit, "order": order})
 
 
@@ -138,8 +142,7 @@ async def get_run_metrics(
     current_user: User = Depends(get_admin_user),
 ):
     """Get metrics for a run. Returns empty dict if no metrics exist."""
-    if not _LETTA_ID_RE.match(run_id):
-        raise HTTPException(status_code=400, detail="Invalid run ID format")
+    _validate_letta_id(run_id)
     return await _proxy_get(f"/v1/runs/{run_id}/metrics")
 
 
@@ -149,8 +152,7 @@ async def get_run_usage(
     current_user: User = Depends(get_admin_user),
 ):
     """Get token usage for a run."""
-    if not _LETTA_ID_RE.match(run_id):
-        raise HTTPException(status_code=400, detail="Invalid run ID format")
+    _validate_letta_id(run_id)
     return await _proxy_get(f"/v1/runs/{run_id}/usage")
 
 
@@ -160,8 +162,7 @@ async def get_step_metrics(
     current_user: User = Depends(get_admin_user),
 ):
     """Get metrics for a step. Returns empty dict if no metrics exist."""
-    if not _LETTA_ID_RE.match(step_id):
-        raise HTTPException(status_code=400, detail="Invalid step ID format")
+    _validate_letta_id(step_id, "step")
     return await _proxy_get(f"/v1/steps/{step_id}/metrics")
 
 
@@ -176,8 +177,7 @@ async def get_run_trace(
     dev stack. This route queries Jaeger's API directly using the
     trace_id stored on the run's steps.
     """
-    if not _LETTA_ID_RE.match(run_id):
-        raise HTTPException(status_code=400, detail="Invalid run ID format")
+    _validate_letta_id(run_id)
     # 1. Get steps to find trace_id
     steps = await _proxy_get(f"/v1/runs/{run_id}/steps", {"limit": 25})
     if not isinstance(steps, list):
