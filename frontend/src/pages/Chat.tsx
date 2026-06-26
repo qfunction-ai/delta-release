@@ -231,7 +231,7 @@ export default function Chat() {
   return (
     <div className="animate-fade-in" style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 4rem)', margin: '-2rem' }}>
       {/* Header */}
-      <div style={{
+      <div className="animate-entry" style={{
         padding: '1rem 2rem',
         borderBottom: '1px solid var(--border)',
         background: 'rgba(19, 23, 32, 0.95)',
@@ -251,7 +251,7 @@ export default function Chat() {
                 background: 'var(--bg-input)',
                 border: '1px solid var(--border)',
                 color: 'var(--text-primary)',
-                fontFamily: 'var(--font-display)',
+                fontFamily: 'var(--font-sans)',
                 fontSize: '0.85rem',
                 padding: '0.4rem 0.75rem',
                 cursor: 'pointer',
@@ -263,12 +263,12 @@ export default function Chat() {
               ))}
             </select>
             {selectedAgent && (
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '0.15rem 0.5rem', border: '1px solid var(--border)' }}>{selectedAgent.model}</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.65rem', color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)', padding: '0.15rem 0.5rem', border: '1px solid var(--border)' }}>{selectedAgent.model}</span>
             )}
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <label htmlFor="toggle-reasoning" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-display)', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
+          <label htmlFor="toggle-reasoning" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer' }}>
             <span>Reasoning</span>
             <ToggleSwitch id="toggle-reasoning" checked={includeReasoning} onChange={() => setIncludeReasoning(!includeReasoning)} aria-label="Toggle reasoning" />
           </label>
@@ -279,7 +279,7 @@ export default function Chat() {
               border: '1px solid var(--border)',
               color: configOpen ? 'var(--accent)' : 'var(--text-secondary)',
               padding: '0.35rem 0.75rem',
-              fontFamily: 'var(--font-display)',
+              fontFamily: 'var(--font-sans)',
               fontSize: '0.7rem',
               cursor: 'pointer',
               transition: 'all 0.15s ease',
@@ -301,13 +301,13 @@ export default function Chat() {
           justifyContent: 'space-between',
           flexShrink: 0,
         }}>
-          <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.75rem', color: '#FDB022' }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: '#FDB022' }}>
             Ollama is not running. Start Ollama on your machine to use chat.
           </span>
           <button
             onClick={() => setOllamaDismissed(true)}
             aria-label="Dismiss Ollama warning"
-            style={{ background: 'none', border: 'none', color: '#FDB022', cursor: 'pointer', fontFamily: 'var(--font-display)', fontSize: '0.85rem', padding: '0 0.5rem' }}
+            style={{ background: 'none', border: 'none', color: '#FDB022', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: '0.85rem', padding: '0 0.5rem' }}
           >
             ×
           </button>
@@ -328,7 +328,7 @@ export default function Chat() {
           {/* Agent selector (if not selected in header) */}
           {selectedAgent && (
             <div>
-              <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Agent</div>
+              <div className="config-section-label">Agent</div>
               <select
                 value={agentId}
                 onChange={(e) => setAgentId(e.target.value)}
@@ -338,7 +338,7 @@ export default function Chat() {
                   background: 'var(--bg-input)',
                   border: '1px solid var(--border)',
                   color: 'var(--text-primary)',
-                  fontFamily: 'var(--font-display)',
+                  fontFamily: 'var(--font-sans)',
                   fontSize: '0.75rem',
                   padding: '0.4rem 0.75rem',
                 }}
@@ -351,12 +351,12 @@ export default function Chat() {
             </div>
           )}
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Skills</div>
+            <div className="config-section-label">Skills</div>
             {skills.length === 0 ? (
-              <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>No skills available</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>No skills available</span>
             ) : (
               skills.map(s => (
-                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-display)', fontSize: '0.75rem', color: selectedSkill === s.id ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.25rem' }}>
+                <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: selectedSkill === s.id ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.25rem' }}>
                   <input type="radio" name="skill" checked={selectedSkill === s.id} onChange={() => toggleSkill(s.id)} style={{ accentColor: 'var(--accent)' }} aria-label={s.name} />
                   <span>{s.name}</span>
                 </label>
@@ -364,13 +364,13 @@ export default function Chat() {
             )}
           </div>
           <div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.65rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>Tools</div>
+            <div className="config-section-label">Tools</div>
             <div style={{ maxHeight: '150px', overflowY: 'auto' }}>
               {tools.length === 0 ? (
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>No tools available</span>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>No tools available</span>
               ) : (
                 tools.map(t => (
-                  <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-display)', fontSize: '0.75rem', color: selectedTools.has(t.id) ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.25rem' }}>
+                  <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: selectedTools.has(t.id) ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.25rem' }}>
                     <input type="checkbox" checked={selectedTools.has(t.id)} onChange={() => toggleTool(t.id)} style={{ accentColor: 'var(--accent)' }} aria-label={t.name} />
                     <span>{t.name}</span>
                   </label>
@@ -385,7 +385,7 @@ export default function Chat() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', marginTop: '3rem' }}>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: '3rem', color: 'var(--accent)', opacity: 0.15, marginBottom: '1rem' }}>f(x)</div>
+            <div style={{ fontFamily: 'var(--font-sans)', fontSize: '3rem', color: 'var(--accent)', opacity: 0.15, marginBottom: '1rem' }}>f(x)</div>
             {agentId ? 'Send a message to start chatting' : 'Select an agent to begin'}
           </div>
         )}
@@ -509,7 +509,7 @@ export default function Chat() {
               border: 'none',
               outline: 'none',
               color: 'var(--text-primary)',
-              fontFamily: 'var(--font-body)',
+              fontFamily: 'var(--font-sans)',
               fontSize: '0.9rem',
               resize: 'none',
               minHeight: '24px',
@@ -560,7 +560,7 @@ export default function Chat() {
             </button>
           )}
         </div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.5rem', textAlign: 'center' }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: '0.6rem', color: 'var(--text-tertiary)', marginTop: '0.5rem', textAlign: 'center' }}>
           λ(msg) → f(agent) → Δ(response)
         </div>
       </div>

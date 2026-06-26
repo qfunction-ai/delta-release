@@ -139,7 +139,7 @@ export default function PackagesSection() {
       </h2>
 
       {packageLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+        <div className="loading-center">
           <LoadingSpinner />
         </div>
       ) : packageError && packages.length === 0 ? (
@@ -150,7 +150,7 @@ export default function PackagesSection() {
         </div>
       ) : packages.length === 0 ? (
         <div className="card">
-          <p className="text-sm text-muted" style={{ fontFamily: 'var(--font-body)' }}>
+          <p className="text-sm text-muted font-sans">
             No packages installed. Install one above to get started.
           </p>
         </div>
@@ -177,9 +177,8 @@ export default function PackagesSection() {
                   </div>
                 </div>
                 <button
-                  className="btn btn-danger btn-sm"
+                  className="btn btn-danger btn-sm item-actions-col"
                   onClick={() => handleUninstall(pkg.name)}
-                  style={{ marginLeft: '1.5rem', flexShrink: 0 }}
                 >
                   Uninstall
                 </button>
