@@ -15,6 +15,8 @@ import logging
 import re
 import time
 
+logger = logging.getLogger(__name__)
+
 from sqlalchemy import insert
 
 from app.audit.models import AuditLog
