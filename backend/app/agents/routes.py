@@ -18,9 +18,6 @@ router = APIRouter(prefix="/api/agents", tags=["agents"])
 
 logger = logging.getLogger(__name__)
 
-# Backward-compatible alias
-CYBERSECURITY_PERSONA = DEFAULT_PERSONA
-
 # Known embedding models with their dimensions
 KNOWN_EMBEDDING_MODELS = [
     {"id": "letta/letta-free", "name": "letta-free", "provider": "letta", "dimensions": 1536},
@@ -30,6 +27,24 @@ KNOWN_EMBEDDING_MODELS = [
 ]
 
 DEFAULT_EMBEDDING = "letta/letta-free"
+
+
+async def _discover_ollama_models() -> tuple[list[dict], str | None]:
+    """Query Ollama for available models. Returns (models, base_url).
+
+    Tries each discovery URL in order, returns models from the first
+    that responds. Returns ([], None) if all URLs fail.
+    """
+    for ollama_url in OLLAMA_DISCOVERY_URLS:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(ollama_url)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data.get("models", []), ollama_url
+        except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException):
+            continue
+    return [], None
 
 
 def _derive_provider_type(model: str) -> str:
@@ -72,24 +87,15 @@ async def list_models(
 
     # Discover LLM models from Ollama (exclude embedding models)
     seen_handles = {m.id for m in result}
-    ollama_urls = OLLAMA_DISCOVERY_URLS
-    for ollama_url in ollama_urls:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as http:
-                response = await http.get(ollama_url)
-                if response.status_code == 200:
-                    data = response.json()
-                    for model in data.get("models", []):
-                        name = model.get("name", "")
-                        handle = f"ollama/{name}"
-                        # Skip embedding models and already-known handles
-                        if "embed" in name.lower() or handle in seen_handles:
-                            continue
-                        result.append(ModelResponse(id=handle, name=name, provider="ollama"))
-                        seen_handles.add(handle)
-                    break
-        except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException):
+    ollama_models, _ = await _discover_ollama_models()
+    for model in ollama_models:
+        name = model.get("name", "")
+        handle = f"ollama/{name}"
+        # Skip embedding models and already-known handles
+        if "embed" in name.lower() or handle in seen_handles:
             continue
+        result.append(ModelResponse(id=handle, name=name, provider="ollama"))
+        seen_handles.add(handle)
 
     return result
 
@@ -105,46 +111,35 @@ async def list_embedding_models(
     models = [EmbeddingModelResponse(**m) for m in KNOWN_EMBEDDING_MODELS]
 
     # Try to discover embedding models from Ollama
-    # From Docker, use host.docker.internal to reach host's Ollama
-    ollama_urls = OLLAMA_DISCOVERY_URLS
-
-    for ollama_url in ollama_urls:
-        try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                response = await client.get(ollama_url)
-                if response.status_code == 200:
-                    data = response.json()
-                    for model in data.get("models", []):
-                        name = model.get("name", "")
-                        # Only include embedding models (name contains "embed")
-                        if "embed" in name.lower():
-                            # Try to get embedding dimensions from model details
-                            dimensions = None
-                            try:
-                                show_resp = await client.post(
-                                    ollama_url.replace("/api/tags", "/api/show"),
-                                    json={"name": name},
-                                )
-                                if show_resp.status_code == 200:
-                                    info = show_resp.json()
-                                    model_info = info.get("model_info", {})
-                                    for key, val in model_info.items():
-                                        if "embedding_length" in key or "embedding_dim" in key:
-                                            dimensions = int(val)
-                                            break
-                            except (httpx.HTTPError, httpx.ConnectError, json.JSONDecodeError, KeyError):
-                                pass
-                            models.append(
-                                EmbeddingModelResponse(
-                                    id=f"ollama/{name}",
-                                    name=name,
-                                    provider="ollama",
-                                    dimensions=dimensions,
-                                )
-                            )
-                    break  # Successfully connected, no need to try other URLs
-        except (httpx.HTTPError, httpx.ConnectError, httpx.TimeoutException):
-            continue  # Try next URL
+    ollama_models, ollama_url = await _discover_ollama_models()
+    if ollama_url:
+        show_url = ollama_url.replace("/api/tags", "/api/show")
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            for model in ollama_models:
+                name = model.get("name", "")
+                # Only include embedding models (name contains "embed")
+                if "embed" in name.lower():
+                    # Try to get embedding dimensions from model details
+                    dimensions = None
+                    try:
+                        show_resp = await client.post(show_url, json={"name": name})
+                        if show_resp.status_code == 200:
+                            info = show_resp.json()
+                            model_info = info.get("model_info", {})
+                            for key, val in model_info.items():
+                                if "embedding_length" in key or "embedding_dim" in key:
+                                    dimensions = int(val)
+                                    break
+                    except (httpx.HTTPError, httpx.ConnectError, json.JSONDecodeError, KeyError):
+                        pass
+                    models.append(
+                        EmbeddingModelResponse(
+                            id=f"ollama/{name}",
+                            name=name,
+                            provider="ollama",
+                            dimensions=dimensions,
+                        )
+                    )
 
     return models
 
@@ -180,7 +175,7 @@ async def create_agent(
         model=agent_data.model,
         embedding=embedding_model,
         memory_blocks=[
-            {"label": "persona", "value": CYBERSECURITY_PERSONA},
+            {"label": "persona", "value": DEFAULT_PERSONA},
             {"label": "human", "value": f"Operator: {current_user.username}"},
             {"label": "workflow_context", "value": ""},
             {"label": "findings", "value": "[]"},

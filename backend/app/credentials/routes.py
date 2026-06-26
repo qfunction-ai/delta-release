@@ -25,6 +25,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/credentials", tags=["credentials"])
 
 
+async def _sync_and_log(user_id: str, db: AsyncSession) -> None:
+    """Sync credential secrets to all user's agents and log any failures."""
+    sync_results = await sync_credential_secrets(user_id, db)
+    if sync_results:
+        failed = [aid for aid, status in sync_results.items() if status == "failed"]
+        if failed:
+            logger.warning("Credential sync failed for %d agent(s): %s", len(failed), failed)
+
+
 @router.get("/providers", response_model=list[ProviderResponse])
 async def list_providers(
     current_user: User = Depends(get_current_user),
@@ -114,11 +123,7 @@ async def create_credential(
     await db.flush()
 
     # Sync credential secrets to all user's agents
-    sync_results = await sync_credential_secrets(current_user.id, db)
-    if sync_results:
-        failed = [aid for aid, status in sync_results.items() if status == "failed"]
-        if failed:
-            logger.warning("Credential sync failed for %d agent(s): %s", len(failed), failed)
+    await _sync_and_log(current_user.id, db)
 
     return CredentialResponse.from_credential(credential)
 
@@ -174,11 +179,7 @@ async def update_credential(
     await db.flush()
 
     # Sync credential secrets to all user's agents
-    sync_results = await sync_credential_secrets(current_user.id, db)
-    if sync_results:
-        failed = [aid for aid, status in sync_results.items() if status == "failed"]
-        if failed:
-            logger.warning("Credential sync failed for %d agent(s): %s", len(failed), failed)
+    await _sync_and_log(current_user.id, db)
 
     return CredentialResponse.from_credential(credential)
 
@@ -198,8 +199,4 @@ async def delete_credential(
     await db.flush()  # Ensure deletion is visible before syncing secrets
 
     # Sync credential secrets to all user's agents (removes deleted credential)
-    sync_results = await sync_credential_secrets(current_user.id, db)
-    if sync_results:
-        failed = [aid for aid, status in sync_results.items() if status == "failed"]
-        if failed:
-            logger.warning("Credential sync failed for %d agent(s): %s", len(failed), failed)
+    await _sync_and_log(current_user.id, db)
