@@ -23,19 +23,14 @@ const SERVICE_LABELS: Record<string, string> = {
 }
 
 function StatusDot({ status }: { status: string }) {
-  const color =
+  const dotClass =
     status === 'healthy'
-      ? 'bg-emerald-400'
+      ? 'health-dot healthy'
       : status === 'unhealthy'
-        ? 'bg-amber-400'
-        : 'bg-red-400'
+        ? 'health-dot unhealthy'
+        : 'health-dot degraded'
 
-  return (
-    <span
-      className={`inline-block w-2.5 h-2.5 rounded-full ${color}`}
-      title={status}
-    />
-  )
+  return <span className={dotClass} title={status} />
 }
 
 export default function InfrastructureSection() {
@@ -65,107 +60,119 @@ export default function InfrastructureSection() {
   }, [fetchHealth])
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div>
+      {/* Section header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <div>
-          <h3 className="text-sm font-mono font-semibold text-[var(--text-primary)]">
+          <h3 className="font-sans" style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)' }}>
             Service Infrastructure
           </h3>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
+          <p className="font-sans" style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
             Connectivity status for all dependent services
           </p>
         </div>
         <button
           onClick={fetchHealth}
           disabled={loading}
-          className="text-xs font-mono px-3 py-1.5 rounded border border-[var(--border-primary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] transition-colors disabled:opacity-50"
+          className="btn btn-sm btn-secondary"
         >
           {loading ? 'Checking...' : 'Refresh'}
         </button>
       </div>
 
+      {/* Error state */}
       {error && (
-        <div className="p-3 rounded border border-red-500/30 bg-red-500/10 text-red-400 text-xs font-mono">
+        <div className="alert-inline alert-inline-danger" style={{ marginBottom: '1rem' }}>
           {error}
         </div>
       )}
 
+      {/* Health data */}
       {health && (
-        <div className="space-y-3">
-          {/* Overall status */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          {/* Overall status banner */}
           <div
-            className={`p-3 rounded border font-mono text-xs ${
-              health.status === 'healthy'
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                : 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-            }`}
+            className={`${health.status === 'healthy' ? 'badge-success' : 'badge-warning'} font-mono`}
+            style={{
+              padding: '0.625rem 1rem',
+              borderRadius: 'var(--radius-md)',
+              letterSpacing: '0.02em',
+            }}
           >
-            Overall: {health.status === 'healthy' ? 'All systems operational' : 'Degraded — some services unavailable'}
+            {health.status === 'healthy' ? 'All systems operational' : 'Degraded — some services unavailable'}
           </div>
 
-          {/* Per-service status */}
-          <div className="space-y-2">
-            {Object.entries(health.services).map(([name, svc]) => (
-              <div
-                key={name}
-                className="flex items-start gap-3 p-3 rounded border border-[var(--border-primary)] bg-[var(--bg-secondary)]"
-              >
+          {/* Per-service cards */}
+          {Object.entries(health.services).map(([name, svc]) => (
+            <div
+              key={name}
+              className="card"
+              style={{ padding: '1rem 1.25rem' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                 <StatusDot status={svc.status} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono font-semibold text-[var(--text-primary)]">
-                      {SERVICE_LABELS[name] || name}
-                    </span>
-                    {svc.optional && (
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
-                        optional
+                <span className="font-sans" style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                  {SERVICE_LABELS[name] || name}
+                </span>
+                {svc.optional && (
+                  <span className="badge badge-idle">optional</span>
+                )}
+                <span style={{ marginLeft: 'auto', fontSize: '0.6875rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                  className={`health-status ${svc.status} font-mono`}
+                >
+                  {svc.status}
+                </span>
+              </div>
+
+              {/* Status detail */}
+              <div style={{ marginTop: '0.5rem', paddingLeft: '1.375rem' }}>
+                {svc.status === 'healthy' && (
+                  <span className="service-status-text healthy">
+                    Healthy
+                    {svc.version && (
+                      <span style={{ marginLeft: '0.5rem', color: 'var(--text-tertiary)' }}>
+                        v{svc.version}
                       </span>
                     )}
+                  </span>
+                )}
+                {svc.status === 'unhealthy' && (
+                  <span className="service-status-text unhealthy">
+                    Unhealthy (HTTP {svc.status_code})
+                  </span>
+                )}
+                {svc.status === 'unreachable' && (
+                  <span className="service-status-text unreachable">
+                    Unreachable — service is not responding
+                  </span>
+                )}
+
+                {/* Models list */}
+                {svc.models && svc.models.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.375rem', marginTop: '0.5rem' }}>
+                    {svc.models.map((m) => (
+                      <span key={m} className="badge badge-info">
+                        {m}
+                      </span>
+                    ))}
                   </div>
-                  <div className="text-[11px] font-mono text-[var(--text-muted)] mt-0.5">
-                    {svc.status === 'healthy' && (
-                      <>
-                        Healthy
-                        {svc.version && (
-                          <span className="ml-2 text-[var(--text-secondary)]">
-                            v{svc.version}
-                          </span>
-                        )}
-                      </>
-                    )}
-                    {svc.status === 'unhealthy' && (
-                      <>Unhealthy (HTTP {svc.status_code})</>
-                    )}
-                    {svc.status === 'unreachable' && (
-                      <>Unreachable — service is not responding</>
-                    )}
+                )}
+
+                {/* Error message */}
+                {svc.error && (
+                  <div className="font-mono" style={{ fontSize: '0.6875rem', color: 'var(--danger)', marginTop: '0.375rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {svc.error}
                   </div>
-                  {svc.models && svc.models.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      {svc.models.map((m) => (
-                        <span
-                          key={m}
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                        >
-                          {m}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {svc.error && (
-                    <div className="text-[10px] font-mono text-red-400 mt-1 truncate">
-                      {svc.error}
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Loading state */}
       {!health && !error && loading && (
-        <div className="text-xs font-mono text-[var(--text-muted)] animate-pulse">
+        <div className="font-mono" style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
           Checking services...
         </div>
       )}
