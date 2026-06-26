@@ -179,7 +179,7 @@ export default function LogsSection() {
       <div className="card logs-viewer-card">
         <div className="logs-viewer-scroll">
           {logEntries.length === 0 && !logLoading ? (
-            <div className="logs-empty-state">
+            <div className="empty-state">
               No log entries found
             </div>
           ) : (

@@ -708,6 +708,7 @@ textarea.input {
 .service-status-text.healthy { color: var(--text-secondary); }
 .service-status-text.unhealthy { color: var(--danger); }
 .service-status-text.unreachable { color: var(--danger); }
+.empty-state { color: var(--text-tertiary); text-align: center; padding: 2rem; }
 
 /* === Animations === */
 @keyframes fade-in {
@@ -2289,12 +2290,6 @@ textarea.input {
   line-height: 1.6;
 }
 
-.logs-empty-state {
-  padding: 2rem;
-  text-align: center;
-  color: var(--text-tertiary);
-}
-
 .logs-entry {
   display: flex;
   gap: 0.75rem;
@@ -2367,7 +2362,6 @@ textarea.input {
 .obs-filter-label { color: var(--text-secondary); font-size: 0.85rem; }
 .obs-filter-label-ml { color: var(--text-secondary); font-size: 0.85rem; margin-left: 0.5rem; }
 .obs-spacer { flex: 1; }
-.obs-empty-state { color: var(--text-tertiary); text-align: center; padding: 2rem; }
 .obs-input-filter { width: 180px; font-size: 0.85rem; }
 
 /* Shared table styles */
@@ -2572,11 +2566,6 @@ textarea.input {
 
 .skills-file-path {
   color: var(--accent);
-}
-
-.skills-empty-state {
-  text-align: center;
-  padding: 2rem 1rem;
 }
 
 .skills-empty-hint {
