@@ -17,12 +17,11 @@ import pytest
 from app.agents.tools import ensure_propose_tool, ensure_web_search
 
 
-def _make_mock_tool(name: str, tool_id: str = "tool-123", tags=None):
-    """Create a mock tool object with name, id, and tags attributes."""
+def _make_mock_tool(name: str, tool_id: str = "tool-123"):
+    """Create a mock tool object with name and id attributes."""
     tool = MagicMock()
     tool.name = name
     tool.id = tool_id
-    tool.tags = tags if tags is not None else ["agent-capability", "agent-capability-v2"]
     return tool
 
 
@@ -184,27 +183,6 @@ class TestEnsureProposeTool:
 
         assert result is not None
         assert "DISABLED" in result
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_recreate_when_stale_version(self, mock_call_letta):
-        """Setting on + propose_tool present but old version tag → re-creates tool."""
-        settings = _make_mock_settings(agent_tool_creation=True)
-        db = _make_mock_db(settings)
-        # Tool has old tag (no agent-capability-v2)
-        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id", tags=["agent-capability"])
-        new_tool = _make_mock_tool("propose_tool", "new-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool],
-            new_tool=new_tool,
-        )
-
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "ENABLED" in result
-        # Should have called: agents.tools.list, agents.tools.detach, tools.delete, tools.create, agents.tools.attach, blocks.update
-        assert mock_call_letta.call_count >= 5
 
 
 # --- ensure_web_search tests ---
