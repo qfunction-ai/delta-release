@@ -24,6 +24,13 @@ _FETCH_DOCS_TOOL_TEMPLATE = '''def fetch_docs(url: str, package: str = "") -> st
 
     api_base = os.getenv("DELTA_API_BASE_URL", "http://localhost:8000")
     service_token = os.getenv("DELTA_SERVICE_TOKEN", "")
+    # Fall back to shared volume file when env var is empty (auto-generated token)
+    if not service_token:
+        try:
+            with open("/data/config/service_token", "r") as f:
+                service_token = f.read().strip()
+        except OSError:
+            pass
     agent_id = {agent_id!r}
 
     headers = {{"Content-Type": "application/json"}}
@@ -56,9 +63,10 @@ def build_fetch_docs_source(agent_id: str) -> str:
     """Generate fetch_docs source code with agent ID baked in.
 
     The service token is read from the DELTA_SERVICE_TOKEN environment
-    variable at runtime instead of being baked into the source code.
-    This prevents the token from being exposed in the Letta sandbox
-    where user-provided tools execute.
+    variable at runtime, with a fallback to /data/config/service_token
+    on the shared config volume (for auto-generated tokens). This prevents
+    the token from being baked into the source code while still working
+    when the token is auto-generated on first run.
     """
     return _FETCH_DOCS_TOOL_TEMPLATE.format(
         agent_id=agent_id,

@@ -36,6 +36,9 @@ class ToolToggleConfig:
     note_attached: str
     # Status note prepended to user message when tool is detached
     note_detached: str
+    # Version tag for source code changes. When the version changes, the old
+    # tool is deleted and re-created with the new source. Format: "v2", "v3", etc.
+    version: str = "v1"
     # Optional: override status text when enabled but a precondition is missing
     # (e.g., EXA_API_KEY not configured). If None, status_text_enabled is used.
     status_text_enabled_warning: str | None = None
@@ -69,17 +72,42 @@ async def _ensure_tool_setting(
 
     # Find the tool among the agent's current tools
     tool_id = None
+    stale_version = False
+    version_tag = f"agent-capability-{config.version}"
     agent_tools = await call_letta(client.agents.tools.list, agent_id=agent_id, raise_on_error=False)
     if agent_tools is not None:
         for tool in agent_tools:
             if tool.name == config.name:
                 tool_id = tool.id
+                # Check if the tool has the current version tag.
+                # Only check for versioned tools (version > "v1"). Built-in
+                # tools like web_search don't have version tags and default
+                # to "v1", so the version check is skipped for them.
+                if config.version != "v1":
+                    tool_tags = getattr(tool, "tags", None) or []
+                    if version_tag not in tool_tags:
+                        stale_version = True
                 break
 
     needs_attach = setting_enabled and not tool_id
+    needs_recreate = setting_enabled and tool_id and stale_version
     needs_detach = not setting_enabled and tool_id
 
-    if needs_attach:
+    if needs_attach or needs_recreate:
+        if needs_recreate and tool_id:
+            # Delete the stale tool before re-creating
+            await call_letta(
+                client.agents.tools.detach,
+                agent_id=agent_id,
+                tool_id=tool_id,
+                raise_on_error=False,
+            )
+            await call_letta(
+                client.tools.delete,
+                tool_id=tool_id,
+                raise_on_error=False,
+            )
+            logger.info("Deleted stale %s tool (version %s) from agent %s", config.name, config.version, agent_id)
         await config.attach_fn(client, agent_id, user_id, db)
     elif needs_detach:
         detach_result = await call_letta(
@@ -92,7 +120,7 @@ async def _ensure_tool_setting(
             logger.info("%s detached from agent %s (setting disabled)", config.name, agent_id)
 
     # Update the workflow_context block and return a status note
-    if needs_attach or needs_detach:
+    if needs_attach or needs_detach or needs_recreate:
         # Determine which status text to use
         use_warning = (
             setting_enabled
@@ -116,9 +144,9 @@ async def _ensure_tool_setting(
         )
 
         # Determine which note to return
-        if needs_attach and use_warning:
+        if (needs_attach or needs_recreate) and use_warning:
             return config.note_attached_warning
-        elif needs_attach:
+        elif needs_attach or needs_recreate:
             return config.note_attached
         else:
             return config.note_detached
@@ -141,7 +169,7 @@ async def _attach_propose_tool(client: Letta, agent_id: str, _user_id: str, _db:
         source_type="python",
         description=PROPOSE_TOOL_DESCRIPTION,
         args_json_schema=PROPOSE_TOOL_SCHEMA,
-        tags=["agent-capability"],
+        tags=["agent-capability", "agent-capability-v2"],
         raise_on_error=False,
     )
     if letta_tool is not None:
@@ -170,7 +198,7 @@ async def _attach_fetch_docs(client: Letta, agent_id: str, _user_id: str, _db: A
         source_type="python",
         description=FETCH_DOCS_DESCRIPTION,
         args_json_schema=FETCH_DOCS_SCHEMA,
-        tags=["agent-capability"],
+        tags=["agent-capability", "agent-capability-v2"],
         raise_on_error=False,
     )
     if letta_tool is not None:
@@ -216,6 +244,7 @@ _PROPOSE_TOOL_CONFIG = ToolToggleConfig(
     name="propose_tool",
     setting_attr="agent_tool_creation",
     attach_fn=_attach_propose_tool,
+    version="v2",
     status_text_enabled=(
         "Tool creation is ENABLED. You have the propose_tool function available "
         "and can create new tools for the operator."
@@ -243,6 +272,7 @@ _FETCH_DOCS_CONFIG = ToolToggleConfig(
     name="fetch_docs",
     setting_attr="docs_fetch_enabled",
     attach_fn=_attach_fetch_docs,
+    version="v2",
     status_text_enabled=(
         "Documentation fetching is ENABLED. You have the fetch_docs function available "
         "and can fetch documentation from allowed domains (readthedocs.io, pypi.org, "
