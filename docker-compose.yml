@@ -192,6 +192,7 @@ services:
     volumes:
       - letta_data:/home/letta/.letta
       - extra_packages:/extra-packages
+      - shared_config:/data/config:ro
       - logs:/data/logs
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
