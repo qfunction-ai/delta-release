@@ -37,7 +37,7 @@ _LIST_GITHUB_REPO_TOOL_TEMPLATE = '''def list_github_repo(repo_url: str, branch:
 
     api_url = "https://api.github.com/repos/{}/{}".format(owner, repo) + "/git/trees/{}?recursive=1".format(branch)
 
-    headers = {{"Accept": "application/vnd.github+json", "User-Agent": "Mozilla/5.0"}}
+    headers = {"Accept": "application/vnd.github+json", "User-Agent": "Mozilla/5.0"}
     try:
         resp = httpx.get(api_url, headers=headers, timeout=30)
         if resp.status_code == 404:
