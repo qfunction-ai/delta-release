@@ -23,6 +23,7 @@ _ALLOWED_DOCS_DOMAINS: dict[str, list[str]] = {
     "pythonhosted.org": ["PyPI package files"],
     "files.pythonhosted.org": ["PyPI package file hosting"],
     "github.com": ["GitHub — README and docs in repos"],
+    "raw.githubusercontent.com": ["GitHub raw file hosting — README and source files"],
     "docs.python.org": ["Official Python documentation"],
     "developers.google.com": ["Google API documentation"],
     "docs.microsoft.com": ["Microsoft documentation"],

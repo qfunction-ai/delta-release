@@ -1,20 +1,20 @@
-"""Tests for ensure_propose_tool and ensure_web_search toggle helpers.
+"""Tests for ensure_tool_creation toggle helper.
 
-These functions attach/detach tools from agents based on user settings.
-They are called on every chat/workflow execution to sync the agent's
-tool list with the current toggle state.
+This function attaches/detaches propose_tool and fetch_docs from agents
+based on the agent_tool_creation user setting. Both tools are controlled
+by a single toggle. They are called on every chat/workflow execution to
+sync the agent's tool list with the current toggle state.
 
 Since these functions use call_letta() which wraps sync Letta client
 calls through run_sync, we mock call_letta directly instead of trying
 to mock the underlying client methods.
 """
 
-import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.tools import ensure_propose_tool, ensure_web_search
+from app.agents.tools import ensure_tool_creation
 
 
 def _make_mock_tool(name: str, tool_id: str = "tool-123"):
@@ -29,7 +29,6 @@ def _make_mock_settings(**kwargs):
     """Create a mock UserSettings object."""
     settings = MagicMock()
     settings.agent_tool_creation = kwargs.get("agent_tool_creation", False)
-    settings.web_search_enabled = kwargs.get("web_search_enabled", False)
     return settings
 
 
@@ -86,220 +85,119 @@ def _make_call_letta_side_effect(agent_tools=None, all_tools=None, new_tool=None
     return _call_letta
 
 
-# --- ensure_propose_tool tests ---
+# --- ensure_tool_creation tests ---
 
 
-class TestEnsureProposeTool:
-    """Tests for ensure_propose_tool — attach/detach propose_tool based on setting."""
+class TestEnsureToolCreation:
+    """Tests for ensure_tool_creation — attach/detach propose_tool and fetch_docs based on setting."""
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
-    async def test_attach_when_enabled_and_not_present(self, mock_call_letta):
-        """Setting on + no propose_tool → creates and attaches tool."""
+    async def test_attach_both_when_enabled_and_not_present(self, mock_call_letta):
+        """Setting on + no tools → creates and attaches both propose_tool and fetch_docs."""
         settings = _make_mock_settings(agent_tool_creation=True)
         db = _make_mock_db(settings)
         mock_call_letta.side_effect = _make_call_letta_side_effect(
             agent_tools=[],  # No tools on agent
         )
 
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
 
         assert result is not None
         assert "ENABLED" in result
-        # Should have called: tools.list (agent), tools.create, agents.tools.attach, blocks.update
-        assert mock_call_letta.call_count >= 3
+        # Should have called: tools.list (agent) x2, tools.create x2, agents.tools.attach x2, blocks.update x2
+        assert mock_call_letta.call_count >= 6
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
-    async def test_noop_when_enabled_and_already_present(self, mock_call_letta):
-        """Setting on + propose_tool already attached → does nothing."""
+    async def test_noop_when_enabled_and_both_present(self, mock_call_letta):
+        """Setting on + both tools already attached → does nothing."""
+        settings = _make_mock_settings(agent_tool_creation=True)
+        db = _make_mock_db(settings)
+        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
+        fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
+        mock_call_letta.side_effect = _make_call_letta_side_effect(
+            agent_tools=[propose_tool, fetch_docs],
+        )
+
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    @patch("app.agents.tools.call_letta")
+    async def test_detach_both_when_disabled_and_present(self, mock_call_letta):
+        """Setting off + both tools attached → detaches both."""
+        settings = _make_mock_settings(agent_tool_creation=False)
+        db = _make_mock_db(settings)
+        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
+        fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
+        mock_call_letta.side_effect = _make_call_letta_side_effect(
+            agent_tools=[propose_tool, fetch_docs],
+        )
+
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
+
+        assert result is not None
+        assert "DISABLED" in result
+        # Should have called: agents.tools.list x2, agents.tools.detach x2, blocks.update x2
+        assert mock_call_letta.call_count >= 4
+
+    @pytest.mark.asyncio
+    @patch("app.agents.tools.call_letta")
+    async def test_noop_when_disabled_and_not_present(self, mock_call_letta):
+        """Setting off + no tools → does nothing."""
+        settings = _make_mock_settings(agent_tool_creation=False)
+        db = _make_mock_db(settings)
+        mock_call_letta.side_effect = _make_call_letta_side_effect(
+            agent_tools=[],
+        )
+
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    @patch("app.agents.tools.call_letta")
+    async def test_noop_when_no_settings(self, mock_call_letta):
+        """No settings record → treated as disabled, no-op if tools not present."""
+        db = _make_mock_db(settings=None)
+        mock_call_letta.side_effect = _make_call_letta_side_effect(
+            agent_tools=[],
+        )
+
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    @patch("app.agents.tools.call_letta")
+    async def test_detach_when_no_settings_but_tools_present(self, mock_call_letta):
+        """No settings record + tools present → detaches both (treated as disabled)."""
+        db = _make_mock_db(settings=None)
+        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
+        fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
+        mock_call_letta.side_effect = _make_call_letta_side_effect(
+            agent_tools=[propose_tool, fetch_docs],
+        )
+
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
+
+        assert result is not None
+        assert "DISABLED" in result
+
+    @pytest.mark.asyncio
+    @patch("app.agents.tools.call_letta")
+    async def test_attaches_missing_tool_when_one_present(self, mock_call_letta):
+        """Setting on + only propose_tool present → attaches fetch_docs only."""
         settings = _make_mock_settings(agent_tool_creation=True)
         db = _make_mock_db(settings)
         propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
         mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool],
+            agent_tools=[propose_tool],  # fetch_docs missing
         )
 
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_detach_when_disabled_and_present(self, mock_call_letta):
-        """Setting off + propose_tool attached → detaches tool."""
-        settings = _make_mock_settings(agent_tool_creation=False)
-        db = _make_mock_db(settings)
-        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool],
-        )
-
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "DISABLED" in result
-        # Should have called: agents.tools.list, agents.tools.detach, blocks.update
-        assert mock_call_letta.call_count >= 2
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_noop_when_disabled_and_not_present(self, mock_call_letta):
-        """Setting off + no propose_tool → does nothing."""
-        settings = _make_mock_settings(agent_tool_creation=False)
-        db = _make_mock_db(settings)
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-        )
-
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_noop_when_no_settings(self, mock_call_letta):
-        """No settings record → treated as disabled, no-op if tool not present."""
-        db = _make_mock_db(settings=None)
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-        )
-
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_detach_when_no_settings_but_tool_present(self, mock_call_letta):
-        """No settings record + tool present → detaches (treated as disabled)."""
-        db = _make_mock_db(settings=None)
-        propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool],
-        )
-
-        result = await ensure_propose_tool(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "DISABLED" in result
-
-
-# --- ensure_web_search tests ---
-
-
-class TestEnsureWebSearch:
-    """Tests for ensure_web_search — attach/detach web_search based on setting."""
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_attach_when_enabled_and_not_present(self, mock_call_letta):
-        """Setting on + no web_search + EXA_API_KEY set → attaches built-in tool."""
-        settings = _make_mock_settings(web_search_enabled=True)
-        db = _make_mock_db(settings)
-        web_search_tool = _make_mock_tool("web_search", "ws-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-            all_tools=MagicMock(items=[web_search_tool]),
-        )
-
-        with patch.dict(os.environ, {"EXA_API_KEY": "test-key"}):
-            result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
+        result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
 
         assert result is not None
         assert "ENABLED" in result
-        assert "EXA_API_KEY" not in result  # Key is configured, no warning
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_attach_warns_when_no_exa_key(self, mock_call_letta):
-        """Setting on + no EXA_API_KEY → attaches tool but warns about missing key."""
-        settings = _make_mock_settings(web_search_enabled=True)
-        db = _make_mock_db(settings)
-        web_search_tool = _make_mock_tool("web_search", "ws-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-            all_tools=MagicMock(items=[web_search_tool]),
-        )
-
-        with patch.dict(os.environ, {}, clear=True):
-            os.environ.pop("EXA_API_KEY", None)
-            result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "ENABLED" in result
-        assert "EXA_API_KEY" in result  # Warning about missing key
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_noop_when_enabled_and_already_present(self, mock_call_letta):
-        """Setting on + web_search already attached → does nothing."""
-        settings = _make_mock_settings(web_search_enabled=True)
-        db = _make_mock_db(settings)
-        web_search_tool = _make_mock_tool("web_search", "ws-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[web_search_tool],
-        )
-
-        with patch.dict(os.environ, {"EXA_API_KEY": "test-key"}):
-            result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_detach_when_disabled_and_present(self, mock_call_letta):
-        """Setting off + web_search attached → detaches tool."""
-        settings = _make_mock_settings(web_search_enabled=False)
-        db = _make_mock_db(settings)
-        web_search_tool = _make_mock_tool("web_search", "ws-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[web_search_tool],
-        )
-
-        result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "DISABLED" in result
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_noop_when_disabled_and_not_present(self, mock_call_letta):
-        """Setting off + no web_search → does nothing."""
-        settings = _make_mock_settings(web_search_enabled=False)
-        db = _make_mock_db(settings)
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-        )
-
-        result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_noop_when_no_settings(self, mock_call_letta):
-        """No settings record → treated as disabled, no-op if tool not present."""
-        db = _make_mock_db(settings=None)
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[],
-        )
-
-        result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    @patch("app.agents.tools.call_letta")
-    async def test_detach_when_no_settings_but_tool_present(self, mock_call_letta):
-        """No settings record + tool present → detaches (treated as disabled)."""
-        db = _make_mock_db(settings=None)
-        web_search_tool = _make_mock_tool("web_search", "ws-tool-id")
-        mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[web_search_tool],
-        )
-
-        result = await ensure_web_search(MagicMock(), "agent-1", "user-1", db)
-
-        assert result is not None
-        assert "DISABLED" in result

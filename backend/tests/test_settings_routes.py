@@ -36,29 +36,4 @@ class TestSettingsRoutes:
         assert resp.status_code == 200
         assert resp.json()["agent_tool_creation"] is False
 
-    async def test_update_web_search(self, registered_client, mock_letta_client):
-        """PUT /api/settings/ updates web_search_enabled."""
-        client, headers, _ = registered_client
-        resp = await client.put(
-            "/api/settings/",
-            headers=headers,
-            json={"web_search_enabled": True},
-        )
-        assert resp.status_code == 200
-        assert resp.json()["web_search_enabled"] is True
 
-    async def test_exa_key_configured_when_set(self, registered_client, mock_letta_client, monkeypatch):
-        """GET /api/settings/ returns exa_key_configured=True when EXA_API_KEY is set."""
-        monkeypatch.setenv("EXA_API_KEY", "test-key-123")
-        client, headers, _ = registered_client
-        resp = await client.get("/api/settings/", headers=headers)
-        assert resp.status_code == 200
-        assert resp.json()["exa_key_configured"] is True
-
-    async def test_exa_key_configured_when_missing(self, registered_client, mock_letta_client, monkeypatch):
-        """GET /api/settings/ returns exa_key_configured=False when EXA_API_KEY is absent."""
-        monkeypatch.delenv("EXA_API_KEY", raising=False)
-        client, headers, _ = registered_client
-        resp = await client.get("/api/settings/", headers=headers)
-        assert resp.status_code == 200
-        assert resp.json()["exa_key_configured"] is False
