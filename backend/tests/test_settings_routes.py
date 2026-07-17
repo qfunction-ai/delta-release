@@ -35,5 +35,3 @@ class TestSettingsRoutes:
         )
         assert resp.status_code == 200
         assert resp.json()["agent_tool_creation"] is False
-
-
