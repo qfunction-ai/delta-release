@@ -1,9 +1,10 @@
 """Tests for ensure_tool_creation toggle helper.
 
-This function attaches/detaches propose_tool, fetch_docs, and list_github_repo
-from agents based on the agent_tool_creation user setting. All three tools are
-controlled by a single toggle. They are called on every chat/workflow execution
-to sync the agent's tool list with the current toggle state.
+This function attaches/detaches propose_tool, fetch_docs, list_github_repo,
+and read_github_file from agents based on the agent_tool_creation user setting.
+All four tools are controlled by a single toggle. They are called on every
+chat/workflow execution to sync the agent's tool list with the current toggle
+state.
 
 Since these functions use call_letta() which wraps sync Letta client
 calls through run_sync, we mock call_letta directly instead of trying
@@ -89,12 +90,12 @@ def _make_call_letta_side_effect(agent_tools=None, all_tools=None, new_tool=None
 
 
 class TestEnsureToolCreation:
-    """Tests for ensure_tool_creation — attach/detach propose_tool, fetch_docs, and list_github_repo based on setting."""
+    """Tests for ensure_tool_creation — attach/detach propose_tool, fetch_docs, list_github_repo, and read_github_file based on setting."""
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
-    async def test_attach_all_three_when_enabled_and_not_present(self, mock_call_letta):
-        """Setting on + no tools → creates and attaches all three tools."""
+    async def test_attach_all_four_when_enabled_and_not_present(self, mock_call_letta):
+        """Setting on + no tools → creates and attaches all four tools."""
         settings = _make_mock_settings(agent_tool_creation=True)
         db = _make_mock_db(settings)
         mock_call_letta.side_effect = _make_call_letta_side_effect(
@@ -105,20 +106,21 @@ class TestEnsureToolCreation:
 
         assert result is not None
         assert "ENABLED" in result
-        # Should have called: tools.list (agent) x3, tools.create x3, agents.tools.attach x3, blocks.update x3
-        assert mock_call_letta.call_count >= 9
+        # Should have called: tools.list (agent) x4, tools.create x4, agents.tools.attach x4, blocks.update x4
+        assert mock_call_letta.call_count >= 12
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
     async def test_noop_when_enabled_and_all_present(self, mock_call_letta):
-        """Setting on + all three tools already attached → does nothing."""
+        """Setting on + all four tools already attached → does nothing."""
         settings = _make_mock_settings(agent_tool_creation=True)
         db = _make_mock_db(settings)
         propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
         fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
         list_repo = _make_mock_tool("list_github_repo", "list-repo-tool-id")
+        read_file = _make_mock_tool("read_github_file", "read-file-tool-id")
         mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool, fetch_docs, list_repo],
+            agent_tools=[propose_tool, fetch_docs, list_repo, read_file],
         )
 
         result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
@@ -127,23 +129,24 @@ class TestEnsureToolCreation:
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
-    async def test_detach_all_three_when_disabled_and_present(self, mock_call_letta):
-        """Setting off + all three tools attached → detaches all three."""
+    async def test_detach_all_four_when_disabled_and_present(self, mock_call_letta):
+        """Setting off + all four tools attached → detaches all four."""
         settings = _make_mock_settings(agent_tool_creation=False)
         db = _make_mock_db(settings)
         propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
         fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
         list_repo = _make_mock_tool("list_github_repo", "list-repo-tool-id")
+        read_file = _make_mock_tool("read_github_file", "read-file-tool-id")
         mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool, fetch_docs, list_repo],
+            agent_tools=[propose_tool, fetch_docs, list_repo, read_file],
         )
 
         result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
 
         assert result is not None
         assert "DISABLED" in result
-        # Should have called: agents.tools.list x3, agents.tools.detach x3, blocks.update x3
-        assert mock_call_letta.call_count >= 6
+        # Should have called: agents.tools.list x4, agents.tools.detach x4, blocks.update x4
+        assert mock_call_letta.call_count >= 8
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
@@ -175,13 +178,14 @@ class TestEnsureToolCreation:
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
     async def test_detach_when_no_settings_but_tools_present(self, mock_call_letta):
-        """No settings record + tools present → detaches all three (treated as disabled)."""
+        """No settings record + tools present → detaches all four (treated as disabled)."""
         db = _make_mock_db(settings=None)
         propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
         fetch_docs = _make_mock_tool("fetch_docs", "fetch-docs-tool-id")
         list_repo = _make_mock_tool("list_github_repo", "list-repo-tool-id")
+        read_file = _make_mock_tool("read_github_file", "read-file-tool-id")
         mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool, fetch_docs, list_repo],
+            agent_tools=[propose_tool, fetch_docs, list_repo, read_file],
         )
 
         result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
@@ -191,13 +195,13 @@ class TestEnsureToolCreation:
 
     @pytest.mark.asyncio
     @patch("app.agents.tools.call_letta")
-    async def test_attaches_missing_tools_when_one_present(self, mock_call_letta):
-        """Setting on + only propose_tool present → attaches fetch_docs and list_github_repo."""
+    async def test_attaches_missing_tools_when_some_present(self, mock_call_letta):
+        """Setting on + only propose_tool present → attaches fetch_docs, list_github_repo, and read_github_file."""
         settings = _make_mock_settings(agent_tool_creation=True)
         db = _make_mock_db(settings)
         propose_tool = _make_mock_tool("propose_tool", "propose-tool-id")
         mock_call_letta.side_effect = _make_call_letta_side_effect(
-            agent_tools=[propose_tool],  # fetch_docs and list_github_repo missing
+            agent_tools=[propose_tool],  # fetch_docs, list_github_repo, read_github_file missing
         )
 
         result = await ensure_tool_creation(MagicMock(), "agent-1", "user-1", db)
