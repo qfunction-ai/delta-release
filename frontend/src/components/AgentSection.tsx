@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiFetch, extractApiError } from '../lib/api'
 import { ERROR_MESSAGES } from '../lib/errors'
 import { useApiFetch } from '../hooks/useApiFetch'
@@ -18,12 +18,19 @@ export default function AgentSection() {
   const { data: settings, loading, error: fetchError, setData: setSettings } = useApiFetch<Settings>('/api/settings/', {
     errorMessage: 'Failed to load settings',
   })
-  const { data: domainsData, loading: domainsLoading } = useApiFetch<DomainsResponse>(
+  const { data: domainsData, loading: domainsLoading, refetch: refetchDomains } = useApiFetch<DomainsResponse>(
     '/api/docs/domains',
-    { errorMessage: 'Failed to load domains', skip: !settings?.agent_tool_creation }
+    { errorMessage: 'Failed to load domains', immediate: false }
   )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Fetch allowed domains when tool creation is enabled
+  useEffect(() => {
+    if (settings?.agent_tool_creation) {
+      refetchDomains()
+    }
+  }, [settings?.agent_tool_creation, refetchDomains])
 
   const toggleSetting = async (key: keyof Settings) => {
     if (!settings) return
