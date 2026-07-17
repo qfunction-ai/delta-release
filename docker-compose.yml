@@ -25,7 +25,6 @@ services:
       - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DELTA_SETUP_TOKEN=${DELTA_SETUP_TOKEN:-}
       - DELTA_DEV_MODE=${DELTA_DEV_MODE:-false}
-      - EXA_API_KEY=${EXA_API_KEY:-}
     volumes:
       - shared_config:/data/config
       - logs:/data/logs
@@ -162,7 +161,6 @@ services:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
       - DELTA_API_BASE_URL=http://backend:8000
       - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
-      - EXA_API_KEY=${EXA_API_KEY:-}
       # PYTHONPATH: /app needed because GHCR image's editable install has
       # letta-0.16.8.dist-info but no .pth file pointing to /app.
       # /extra-packages for pip-sidecar installed packages.
