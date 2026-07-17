@@ -107,7 +107,7 @@ The execution unit — a prompt template bound to an agent, with optional tools 
 
 ### Tool Proposals
 
-When the `agent_tool_creation` setting is enabled, agents can propose new tools at runtime. The agent calls `propose_tool` with a name, description, source code, and JSON schema. The proposal enters a pending state with dry-run results, requiring human review and approval before activation.
+When the `agent_tool_creation` setting is enabled, agents can propose new tools at runtime. The agent calls `propose_tool` with a name, description, source code, and JSON schema. The proposal enters a pending state with dry-run results, requiring human review and approval before activation. Enabling this setting also attaches the `fetch_docs` tool, which lets agents fetch documentation from allowed domains before proposing tools. Agents are instructed to never guess API signatures from memory — they must fetch documentation first or tell the operator that documentation could not be retrieved.
 
 ### Credentials
 
@@ -131,7 +131,7 @@ Migrate tools, skills, and workflows between Delta instances. Export produces a 
 
 ### Docs
 
-SSRF-safe documentation proxy for agents. Agents can fetch documentation from URLs at runtime through the `/api/docs/fetch` endpoint, which validates URLs against private IP ranges, pins resolved addresses to prevent DNS rebinding, converts HTML to text, and truncates responses.
+SSRF-safe documentation proxy for agents. Agents can fetch documentation from URLs at runtime through the `/api/docs/fetch` endpoint, which validates URLs against a domain allowlist and private IP ranges, pins resolved addresses to prevent DNS rebinding, converts HTML to text, and truncates responses. Allowed documentation domains (readthedocs.io, pypi.org, github.com, raw.githubusercontent.com, docs.python.org, etc.) are returned by the `GET /api/docs/domains` endpoint.
 
 ### Execution Feedback Loop
 
@@ -149,7 +149,7 @@ Deterministic check types include `StringMatching`, `RegexMatching`, `Equals`, `
 
 ### Settings
 
-User settings that gate agent capabilities. Controls `agent_tool_creation` (tool proposal toggle) and `web_search_enabled` (web search tool attachment). Admin page at `/settings` also provides package management (pip install/uninstall to shared volume) and credential management.
+User settings that gate agent capabilities. Controls `agent_tool_creation` (tool proposal and documentation fetching toggle). Admin page at `/settings` also provides package management (pip install/uninstall to shared volume) and credential management.
 
 ## API
 
@@ -225,12 +225,6 @@ All variables use the `DELTA_` prefix. Docker Compose maps them from `.env`.
 | `DELTA_EVALS_DIR` | `/app/evals` | Base directory for eval scenario YAML files |
 | `DELTA_EVAL_JUDGE_MODEL` | `ollama/gemma4:latest` | LLM judge model for Conformity/LLMJudge checks |
 | `DELTA_EVAL_JUDGE_BASE_URL` | `http://host.docker.internal:11434/v1` | LLM judge API base URL |
-
-**Optional integrations:**
-
-| Variable | Description |
-|----------|-------------|
-| `EXA_API_KEY` | Exa API key for agent web search (enables `web_search` tool) |
 
 ## Database Migrations
 
