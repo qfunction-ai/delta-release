@@ -32,9 +32,6 @@ vi.mock('../ToggleSwitch', () => ({
 const defaultSettings = {
   agent_tool_creation: false,
   eval_enabled: false,
-  web_search_enabled: false,
-  docs_fetch_enabled: false,
-  exa_key_configured: false,
 }
 
 function setupMock(settings = defaultSettings) {
@@ -70,12 +67,18 @@ describe('AgentSection', () => {
     })
   })
 
-  it('shows EXA_API_KEY warning when web_search is enabled but key is not configured', async () => {
-    setupMock({ ...defaultSettings, web_search_enabled: true, exa_key_configured: false })
+  it('shows allowed domains when agent_tool_creation is enabled', async () => {
+    setupMock({ ...defaultSettings, agent_tool_creation: true })
+    // Mock the domains endpoint
+    mockApiFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ domains: ['github.com', 'readthedocs.io'] }),
+    } as unknown as Response)
     render(<AgentSection />)
 
     await waitFor(() => {
-      expect(screen.getByText(/EXA_API_KEY is not configured/)).toBeInTheDocument()
+      expect(screen.getByText('github.com')).toBeInTheDocument()
+      expect(screen.getByText('readthedocs.io')).toBeInTheDocument()
     })
   })
 
@@ -109,15 +112,6 @@ describe('AgentSection', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Failed to load settings')).toBeInTheDocument()
-    })
-  })
-
-  it('shows risk warning when docs_fetch_enabled is enabled', async () => {
-    setupMock({ ...defaultSettings, docs_fetch_enabled: true })
-    render(<AgentSection />)
-
-    await waitFor(() => {
-      expect(screen.getByText(/adversarial content/)).toBeInTheDocument()
     })
   })
 })

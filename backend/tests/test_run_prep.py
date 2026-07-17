@@ -172,9 +172,7 @@ class TestPrepareWorkflowRun:
             patch("app.workflows.template.render_template", return_value="Search for test"),
             patch("app.agents.run_prep.prepare_prompt_context", new_callable=AsyncMock, return_value="Search for test"),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock),
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
         ):
             db = AsyncMock()
             rendered_prompt, run, returned_client = await prepare_workflow_run(
@@ -200,9 +198,7 @@ class TestPrepareWorkflowRun:
             patch("app.workflows.template.render_template", return_value="prompt"),
             patch("app.agents.run_prep.prepare_prompt_context", new_callable=AsyncMock, return_value="prompt"),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock) as mock_attach,
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
         ):
             db = AsyncMock()
             await prepare_workflow_run(workflow, {}, "user-1", db)
@@ -221,9 +217,7 @@ class TestPrepareChatRun:
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock),
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
         ):
             db = AsyncMock()
             rendered_message, returned_client = await prepare_chat_run(
@@ -239,17 +233,15 @@ class TestPrepareChatRun:
         assert returned_client == client
 
     @pytest.mark.asyncio
-    async def test_propose_tool_status_prepended(self):
-        """Propose tool status note is prepended to message."""
+    async def test_tool_creation_status_prepended(self):
+        """Tool creation status note is prepended to message."""
         client = MagicMock()
         status_note = "[System: Tool creation ENABLED]\n"
 
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock),
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=status_note),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=status_note),
         ):
             db = AsyncMock()
             rendered_message, _ = await prepare_chat_run(
@@ -265,32 +257,6 @@ class TestPrepareChatRun:
         assert "Hello" in rendered_message
 
     @pytest.mark.asyncio
-    async def test_web_search_status_prepended(self):
-        """Web search status note is prepended to message."""
-        client = MagicMock()
-        status_note = "[System: Web search ENABLED]\n"
-
-        with (
-            patch("app.letta_client.get_letta_client", return_value=client),
-            patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock),
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=status_note),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
-        ):
-            db = AsyncMock()
-            rendered_message, _ = await prepare_chat_run(
-                agent_id="agent-1",
-                tool_ids=[],
-                skill_ids=[],
-                user_id="user-1",
-                db=db,
-                message="Search",
-            )
-
-        assert rendered_message.startswith("[System:")
-        assert "Search" in rendered_message
-
-    @pytest.mark.asyncio
     async def test_with_skills_inserts_into_archival_memory(self):
         """Skills are inserted into archival memory and prefix prepended."""
         client = MagicMock()
@@ -301,9 +267,7 @@ class TestPrepareChatRun:
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock),
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
             patch("app.agents.run_prep.get_skills_by_ids", new_callable=AsyncMock, return_value=[skill]),
             patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=[]),
             patch("app.agents.run_prep.ensure_archival_memory_search", new_callable=AsyncMock),
@@ -338,9 +302,7 @@ class TestPrepareChatRun:
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock) as mock_attach,
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
             patch("app.agents.run_prep.get_skills_by_ids", new_callable=AsyncMock, return_value=[skill]),
             patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=["tool-from-skill"]),
             patch("app.agents.run_prep.ensure_archival_memory_search", new_callable=AsyncMock),
@@ -379,9 +341,7 @@ class TestPrepareChatRun:
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock) as mock_attach,
-            patch("app.agents.run_prep.ensure_propose_tool", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_web_search", new_callable=AsyncMock, return_value=None),
-            patch("app.agents.run_prep.ensure_fetch_docs", new_callable=AsyncMock, return_value=None),
+            patch("app.agents.run_prep.ensure_tool_creation", new_callable=AsyncMock, return_value=None),
             patch("app.agents.run_prep.get_skills_by_ids", new_callable=AsyncMock, return_value=[skill]),
             patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=["shared-tool"]),
             patch("app.agents.run_prep.ensure_archival_memory_search", new_callable=AsyncMock),

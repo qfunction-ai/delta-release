@@ -12,7 +12,7 @@ from app.settings.service import get_or_create_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-_UPDATABLE_FIELDS = ("agent_tool_creation", "eval_enabled", "web_search_enabled", "docs_fetch_enabled")
+_UPDATABLE_FIELDS = ("agent_tool_creation", "eval_enabled")
 
 
 def _apply_settings_update(settings: UserSettings, data: UserSettingsUpdate) -> None:
@@ -61,7 +61,7 @@ async def eval_update_settings(
     Resolves the user from the agent_id, then updates their settings.
     All toggle fields are accepted — the service token is the trust
     boundary, not the endpoint. The eval container needs to control
-    agent_tool_creation and web_search_enabled to test toggle behavior.
+    agent_tool_creation to test toggle behavior.
 
     Requires X-Service-Token header for authentication.
     """

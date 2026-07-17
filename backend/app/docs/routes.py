@@ -47,14 +47,14 @@ class DocsFetchResponse(BaseModel):
 
 async def _do_fetch_docs(req: DocsFetchRequest, user_id: str, db: AsyncSession) -> DocsFetchResponse:
     """Shared fetch logic for both user and agent endpoints."""
-    # Check that docs_fetch_enabled is on
+    # Check that agent_tool_creation is on (enables both propose_tool and fetch_docs)
     from app.settings.service import get_or_create_settings
 
     settings = await get_or_create_settings(user_id, db)
-    if not settings.docs_fetch_enabled:
+    if not settings.agent_tool_creation:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Documentation fetching is disabled. Enable it in Settings.",
+            detail="Tool creation is disabled. Enable it in Settings to allow documentation fetching.",
         )
 
     # Validate the URL (domain allowlist + SSRF protection via IP resolution)
@@ -78,7 +78,7 @@ async def _do_fetch_docs(req: DocsFetchRequest, user_id: str, db: AsyncSession) 
         # Use original URL — TLS cert validation prevents DNS rebinding
         fetch_url = req.url
         fetch_headers = {
-            "User-Agent": "Delta-Docs-Fetcher/1.0",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
             "Accept": "text/html,text/plain,application/json",
             "Accept-Encoding": "gzip, deflate",
         }
@@ -86,7 +86,7 @@ async def _do_fetch_docs(req: DocsFetchRequest, user_id: str, db: AsyncSession) 
         # Pin IP for HTTP — no TLS to protect against rebinding
         fetch_url, pin_headers = pin_url(req.url, resolved_ip)
         fetch_headers = {
-            "User-Agent": "Delta-Docs-Fetcher/1.0",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
             "Accept": "text/html,text/plain,application/json",
             "Accept-Encoding": "gzip, deflate",
             **pin_headers,
@@ -121,14 +121,14 @@ async def _do_fetch_docs(req: DocsFetchRequest, user_id: str, db: AsyncSession) 
                 if redirect_is_https:
                     current_url = redirect_url
                     current_headers = {
-                        "User-Agent": "Delta-Docs-Fetcher/1.0",
+                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
                         "Accept": "text/html,text/plain,application/json",
                         "Accept-Encoding": "gzip, deflate",
                     }
                 else:
                     current_url, redirect_pin_headers = pin_url(redirect_url, redirect_ip)
                     current_headers = {
-                        "User-Agent": "Delta-Docs-Fetcher/1.0",
+                        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0",
                         "Accept": "text/html,text/plain,application/json",
                         "Accept-Encoding": "gzip, deflate",
                         **redirect_pin_headers,
@@ -225,3 +225,13 @@ async def fetch_docs_agent(
     agent = await get_agent_by_letta_id_or_404(db, agent_id)
 
     return await _do_fetch_docs(req, str(agent.user_id), db)
+
+
+@router.get("/domains")
+async def get_docs_domains(
+    current_user=Depends(get_current_user),
+):
+    """Return the list of allowed documentation domains."""
+    from app.docs.sanitize import _ALLOWED_DOCS_DOMAINS
+
+    return {"domains": sorted(_ALLOWED_DOCS_DOMAINS.keys())}

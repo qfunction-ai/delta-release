@@ -7,15 +7,21 @@ import AlertBox from './AlertBox'
 
 interface Settings {
   agent_tool_creation: boolean
-  web_search_enabled: boolean
-  docs_fetch_enabled: boolean
-  exa_key_configured: boolean
+  eval_enabled: boolean
+}
+
+interface DomainsResponse {
+  domains: string[]
 }
 
 export default function AgentSection() {
   const { data: settings, loading, error: fetchError, setData: setSettings } = useApiFetch<Settings>('/api/settings/', {
     errorMessage: 'Failed to load settings',
   })
+  const { data: domainsData, loading: domainsLoading } = useApiFetch<DomainsResponse>(
+    '/api/docs/domains',
+    { errorMessage: 'Failed to load domains', skip: !settings?.agent_tool_creation }
+  )
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -61,8 +67,8 @@ export default function AgentSection() {
           <div className="toggle-card-description">
             <h3 className="toggle-card-heading">Allow agents to propose tools</h3>
             <p className="text-sm text-muted">
-              When enabled, agents can draft new tools during conversations.
-              Proposed tools require your approval before they can be used.
+              When enabled, agents can draft new tools during conversations and fetch documentation
+              from allowed domains. Proposed tools require your approval before use.
             </p>
           </div>
           <ToggleSwitch
@@ -74,65 +80,28 @@ export default function AgentSection() {
         </div>
 
         {settings.agent_tool_creation && (
-          <AlertBox variant="warning">
-            Agent-proposed tools are AI-generated. Always review the behavior before approving.
-          </AlertBox>
-        )}
-      </div>
+          <>
+            <AlertBox variant="warning">
+              Agent-proposed tools are AI-generated. Always review the behavior before approving.
+              Fetched documentation is from external sources and may contain adversarial content.
+            </AlertBox>
 
-      {/* Web Search Toggle */}
-      <div className="card mb-6">
-        <div className="flex items-center justify-between">
-          <div className="toggle-card-description">
-            <h3 className="toggle-card-heading">Allow agents to search the web</h3>
-            <p className="text-sm text-muted">
-              When enabled, agents can search the web for library documentation before proposing tools.
-              Requires EXA_API_KEY to be configured.
-            </p>
-          </div>
-          <ToggleSwitch
-            checked={settings.web_search_enabled}
-            onChange={() => toggleSetting('web_search_enabled')}
-            disabled={saving}
-            aria-label="Allow agents to search the web"
-          />
-        </div>
-
-        {settings.web_search_enabled && !settings.exa_key_configured && (
-          <AlertBox variant="danger">
-            EXA_API_KEY is not configured. The web_search tool will be attached but calls will fail until the API key is set in the environment.
-          </AlertBox>
-        )}
-
-        {settings.web_search_enabled && settings.exa_key_configured && (
-          <AlertBox variant="warning">
-            Web search allows agents to query the internet. Searches are limited to documentation lookups via persona instructions, but the capability cannot be technically restricted to specific topics.
-          </AlertBox>
-        )}
-      </div>
-
-      {/* Documentation Fetch Toggle */}
-      <div className="card mb-6">
-        <div className="flex items-center justify-between">
-          <div className="toggle-card-description">
-            <h3 className="toggle-card-heading">Allow agents to fetch documentation</h3>
-            <p className="text-sm text-muted">
-              When enabled, agents can fetch full documentation pages from allowed domains before proposing tools.
-              This provides more detailed API references than web search snippets.
-            </p>
-          </div>
-          <ToggleSwitch
-            checked={settings.docs_fetch_enabled}
-            onChange={() => toggleSetting('docs_fetch_enabled')}
-            disabled={saving}
-            aria-label="Allow agents to fetch documentation"
-          />
-        </div>
-
-        {settings.docs_fetch_enabled && (
-          <AlertBox variant="warning">
-            Fetched documentation is injected into the agent's context as untrusted text. Although domains are restricted and SSRF-protected, pages on allowed domains may contain adversarial content (e.g., prompt injection). Review proposed tools carefully before approving.
-          </AlertBox>
+            {!domainsLoading && domainsData && domainsData.domains.length > 0 && (
+              <div className="mt-4">
+                <p className="text-sm text-muted mb-2">Allowed documentation domains:</p>
+                <div className="flex flex-wrap gap-2">
+                  {domainsData.domains.map((domain) => (
+                    <span
+                      key={domain}
+                      className="px-2 py-1 text-xs rounded bg-surface text-muted border border-border"
+                    >
+                      {domain}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 

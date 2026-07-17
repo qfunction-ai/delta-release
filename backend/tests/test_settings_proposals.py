@@ -86,7 +86,6 @@ class TestSettingsRoutes:
         data = resp.json()
         assert data["agent_tool_creation"] is False
         assert data["eval_enabled"] is False
-        assert data["web_search_enabled"] is False
 
     @pytest.mark.asyncio
     async def test_update_settings_agent_tool_creation(self, registered_client, mock_letta_client):
@@ -128,23 +127,6 @@ class TestSettingsRoutes:
         )
         assert resp.status_code == 200
         assert resp.json()["eval_enabled"] is True
-
-    @pytest.mark.asyncio
-    async def test_update_settings_web_search_enabled(self, registered_client, mock_letta_client):
-        """PUT /api/settings/ toggles web_search_enabled."""
-        client, headers, _ = registered_client
-
-        await client.get("/api/settings/", headers=headers)
-
-        resp = await client.put(
-            "/api/settings/",
-            headers=headers,
-            json={
-                "web_search_enabled": True,
-            },
-        )
-        assert resp.status_code == 200
-        assert resp.json()["web_search_enabled"] is True
 
     @pytest.mark.asyncio
     async def test_eval_update_settings_requires_service_token(self, registered_client, mock_letta_client, app_client):
@@ -189,7 +171,7 @@ class TestSettingsRoutes:
 
     @pytest.mark.asyncio
     async def test_eval_update_settings_allows_all_toggles(self, registered_client, mock_letta_client, app_client):
-        """PUT /api/settings/eval accepts agent_tool_creation and web_search_enabled."""
+        """PUT /api/settings/eval accepts agent_tool_creation."""
         client, headers, _ = registered_client
 
         # First, create an agent to use for the eval endpoint
@@ -214,7 +196,7 @@ class TestSettingsRoutes:
         test_app.dependency_overrides[verify_service_token] = lambda: None
 
         try:
-            # Set all three toggles via eval endpoint
+            # Set toggles via eval endpoint
             resp = await client.put(
                 f"/api/settings/eval?agent_id={agent_id}",
                 headers={
@@ -223,7 +205,6 @@ class TestSettingsRoutes:
                 json={
                     "eval_enabled": True,
                     "agent_tool_creation": True,
-                    "web_search_enabled": True,
                 },
             )
         finally:
@@ -233,9 +214,7 @@ class TestSettingsRoutes:
         data = resp.json()
         assert data["eval_enabled"] is True
         assert data["agent_tool_creation"] is True
-        assert data["web_search_enabled"] is True
 
         # Verify settings persisted
         settings_resp = await client.get("/api/settings/", headers=headers)
         assert settings_resp.json()["agent_tool_creation"] is True
-        assert settings_resp.json()["web_search_enabled"] is True

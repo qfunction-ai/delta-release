@@ -55,11 +55,11 @@ class TestDocsFetchRoutes:
         """Fetched content is wrapped in EXTERNAL DOCUMENTATION delimiters."""
         client, headers, _ = registered_client
 
-        # Enable docs_fetch_enabled
+        # Enable agent_tool_creation (which enables both propose_tool and fetch_docs)
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -87,10 +87,10 @@ class TestDocsFetchRoutes:
         assert "HostsAPI.query_devices" in data["content"]
 
     async def test_fetch_disabled_returns_403(self, registered_client, mock_letta_client):
-        """When docs_fetch_enabled is False, the endpoint returns 403."""
+        """When agent_tool_creation is False, the endpoint returns 403."""
         client, headers, _ = registered_client
 
-        # docs_fetch_enabled defaults to False, no need to set it
+        # agent_tool_creation defaults to False, no need to set it
 
         resp = await client.post(
             "/api/docs/fetch",
@@ -105,11 +105,11 @@ class TestDocsFetchRoutes:
         """When the domain is not in the allowlist, the endpoint returns 400."""
         client, headers, _ = registered_client
 
-        # Enable docs_fetch_enabled
+        # Enable agent_tool_creation (which enables both propose_tool and fetch_docs)
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -122,25 +122,34 @@ class TestDocsFetchRoutes:
         assert resp.status_code == 400
         assert "not in the documentation allowlist" in resp.json()["detail"]
 
-    async def test_fetch_raw_githubusercontent_blocked(self, registered_client, mock_letta_client):
-        """raw.githubusercontent.com is blocked (removed from allowlist)."""
+    async def test_fetch_raw_githubusercontent_allowed(self, registered_client, mock_letta_client):
+        """raw.githubusercontent.com is now allowed — raw README and source files from GitHub."""
         client, headers, _ = registered_client
 
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
-        resp = await client.post(
-            "/api/docs/fetch",
-            headers=headers,
-            json={"url": "https://raw.githubusercontent.com/org/repo/main/README.md"},
+        mock_resp = _mock_httpx_response(
+            text="def example(): pass",
+            content_type="text/plain",
         )
+        mock_client = _mock_async_client([mock_resp])
 
-        assert resp.status_code == 400
-        assert "not in the documentation allowlist" in resp.json()["detail"]
+        with (
+            patch("app.docs.routes.validate_docs_url", return_value=(True, "", "1.2.3.4")),
+            patch("app.docs.routes.httpx.AsyncClient", return_value=mock_client),
+        ):
+            resp = await client.post(
+                "/api/docs/fetch",
+                headers=headers,
+                json={"url": "https://raw.githubusercontent.com/org/repo/main/README.md"},
+            )
+
+        assert resp.status_code == 200
 
     async def test_fetch_redirect_to_disallowed_domain_rejected(self, registered_client, mock_letta_client):
         """Redirects to disallowed domains are rejected mid-chain."""
@@ -149,7 +158,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -186,7 +195,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -215,7 +224,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -248,7 +257,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -278,7 +287,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 
@@ -307,7 +316,7 @@ class TestDocsFetchRoutes:
         resp = await client.put(
             "/api/settings/",
             headers=headers,
-            json={"docs_fetch_enabled": True},
+            json={"agent_tool_creation": True},
         )
         assert resp.status_code == 200
 

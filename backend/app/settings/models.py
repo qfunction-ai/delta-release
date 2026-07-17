@@ -17,17 +17,3 @@ class UserSettings(Base, OwnedMixin, TimestampMixin):
         doc="Whether this user's agents can be accessed by the eval container. "
         "Must be explicitly enabled before evals can run against this user's agents.",
     )
-
-    web_search_enabled: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        doc="Whether agents can use the web_search tool to look up library documentation.",
-    )
-
-    docs_fetch_enabled: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=False,
-        doc="Whether agents can fetch documentation from allowed domains before proposing tools.",
-    )

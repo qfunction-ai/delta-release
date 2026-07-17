@@ -26,9 +26,9 @@ class TestIsAllowedDocsDomain:
         assert _is_allowed_docs_domain("notdocs.io") is False
         assert _is_allowed_docs_domain("internal.company.com") is False
 
-    def test_raw_githubusercontent_blocked(self):
-        """raw.githubusercontent.com removed — raw text bypasses HTML sanitization."""
-        assert _is_allowed_docs_domain("raw.githubusercontent.com") is False
+    def test_raw_githubusercontent_allowed(self):
+        """raw.githubusercontent.com allowed — raw README and source files from GitHub."""
+        assert _is_allowed_docs_domain("raw.githubusercontent.com") is True
 
     def test_ultrasaurus_blocked(self):
         """docs.ultrasaurus.com removed — legacy entry with no justification."""

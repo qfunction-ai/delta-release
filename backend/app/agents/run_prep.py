@@ -13,7 +13,7 @@ from app.agents.archival_memory import (
 from app.agents.lessons import get_lessons_for_workflow
 from app.agents.prompts import build_lesson_prompt_prefix, build_skill_inline_block, build_skill_prompt_prefix
 from app.agents.skills import get_skill_tool_ids, get_skills_by_ids
-from app.agents.tools import attach_tools_to_agent, ensure_fetch_docs, ensure_propose_tool, ensure_web_search
+from app.agents.tools import attach_tools_to_agent, ensure_tool_creation
 from app.constants import RUN_PENDING, RUN_RUNNING
 from app.workflows.models import Workflow, WorkflowRun
 
@@ -139,14 +139,8 @@ async def prepare_workflow_run(
     if all_tool_ids:
         await attach_tools_to_agent(client, workflow.agent_id, all_tool_ids, user_id, db)
 
-    # Attach propose_tool if setting is enabled
-    await ensure_propose_tool(client, workflow.agent_id, user_id, db)
-
-    # Attach web_search if setting is enabled
-    await ensure_web_search(client, workflow.agent_id, user_id, db)
-
-    # Attach fetch_docs if setting is enabled
-    await ensure_fetch_docs(client, workflow.agent_id, user_id, db)
+    # Attach propose_tool and fetch_docs if tool creation is enabled
+    await ensure_tool_creation(client, workflow.agent_id, user_id, db)
 
     # Mark as running
     run.status = RUN_RUNNING
@@ -191,20 +185,10 @@ async def prepare_chat_run(
     if all_tool_ids:
         await attach_tools_to_agent(client, agent_id, all_tool_ids, user_id, db)
 
-    # Attach propose_tool if setting is enabled
-    tool_status_note = await ensure_propose_tool(client, agent_id, user_id, db)
+    # Attach propose_tool and fetch_docs if tool creation is enabled
+    tool_status_note = await ensure_tool_creation(client, agent_id, user_id, db)
     if tool_status_note:
         rendered_message = tool_status_note + rendered_message
-
-    # Attach web_search if setting is enabled
-    web_status_note = await ensure_web_search(client, agent_id, user_id, db)
-    if web_status_note:
-        rendered_message = web_status_note + rendered_message
-
-    # Attach fetch_docs if setting is enabled
-    docs_status_note = await ensure_fetch_docs(client, agent_id, user_id, db)
-    if docs_status_note:
-        rendered_message = docs_status_note + rendered_message
 
     # Insert skills into archival memory AND inject content inline
     if skills:
