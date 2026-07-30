@@ -442,14 +442,12 @@ async def attach_file_tools(client: Letta, agent_id: str) -> list[str]:
         if not tool_id:
             logger.warning("File tool %s not found in Letta — skipping", name)
             continue
-        result = await call_letta(
+        await call_letta(
             client.agents.tools.attach,
             agent_id=agent_id,
             tool_id=tool_id,
-            raise_on_error=False,
         )
-        if result is not None:
-            attached.append(name)
+        attached.append(name)
 
     if attached:
         logger.info("Attached file tools to agent %s: %s", agent_id, attached)
