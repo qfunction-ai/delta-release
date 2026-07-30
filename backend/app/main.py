@@ -55,10 +55,14 @@ if _log_dir_exists:
     file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s [%(name)s] %(message)s"))
     file_handler.setLevel(logging.INFO)
 
-    # Attach to root logger so all app modules are captured
-    root_logger = logging.getLogger()
-    root_logger.setLevel(logging.INFO)  # Allow INFO+ to reach handlers
-    root_logger.addHandler(file_handler)
+    # Attach to the "app" logger, not the root logger.
+    # uvicorn's dictConfig replaces the root logger's handlers on startup,
+    # which would remove our file handler. The "app" logger is unaffected
+    # by uvicorn's config, and with propagate=True (default), messages
+    # also reach the root logger's console handler for stdout/Docker logs.
+    app_logger = logging.getLogger("app")
+    app_logger.setLevel(logging.INFO)
+    app_logger.addHandler(file_handler)
 
 # Quieten SQLAlchemy engine logging — echo=True in dev mode is very verbose
 # Set level on the logger (not just the handler) so it doesn't propagate
