@@ -95,6 +95,10 @@ Python functions that agents call during execution. Tools are written with type-
 
 Instruction documents (SKILL.md) that guide agent behavior. Skills are uploaded as `.zip` packages, imported from GitHub, or created manually. At workflow runtime, skill content is injected into the agent's archival memory and discovered via `archival_memory_search`.
 
+**Required-tool enforcement:** When a skill has linked tools (via the skill-tool join table), Delta injects a `<skill_state>` metadata block into the user message. The Letta Local fork parses this block and registers `RequiredBeforeExitToolRule` entries for each linked tool. This prevents the agent from stopping mid-skill — if the agent calls `send_message` (a terminal tool) before all required tools have been called, the harness forces the loop to continue with a heartbeat message listing the uncalled tools. The metadata block is stripped from the message before the LLM sees it.
+
+**Important for skill creators:** All tools linked to a skill become **required** before the agent can stop — not just "available." Only link tools that are mandatory steps in the skill workflow. Optional or conditional tools should not be linked to the skill; they can still be attached to the agent separately without being linked.
+
 ### Workflows
 
 The execution unit — a prompt template bound to an agent, with optional tools and skills:
