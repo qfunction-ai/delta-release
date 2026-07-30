@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.run_prep import prepare_chat_run, prepare_prompt_context, prepare_workflow_run
+from app.agents.run_prep import inject_skill_context, prepare_chat_run, prepare_prompt_context, prepare_workflow_run
 
 
 def _make_workflow(
@@ -68,6 +68,7 @@ class TestPreparePromptContext:
             ),
             patch("app.agents.run_prep.get_lessons_for_workflow", new_callable=AsyncMock, return_value=[]),
             patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
+            patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=[]),
         ):
             result = await prepare_prompt_context(workflow, "agent-1", "test prompt", client, db)
 
@@ -120,6 +121,7 @@ class TestPreparePromptContext:
             patch("app.agents.run_prep.insert_skills_into_archival_memory", new_callable=AsyncMock, return_value=[]),
             patch("app.agents.run_prep.get_lessons_for_workflow", new_callable=AsyncMock, return_value=[]),
             patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
+            patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=[]),
         ):
             result = await prepare_prompt_context(workflow, "agent-1", "test prompt", client, db)
 
@@ -299,6 +301,9 @@ class TestPrepareChatRun:
         skill.content = "Skill content"
         skill.id = "skill-uuid-1"
 
+        mock_tool_result = MagicMock()
+        mock_tool_result.all.return_value = [("tool-from-skill", "tool-from-skill")]
+
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock) as mock_attach,
@@ -314,6 +319,7 @@ class TestPrepareChatRun:
             patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
         ):
             db = AsyncMock()
+            db.execute = AsyncMock(return_value=mock_tool_result)
             rendered_message, _ = await prepare_chat_run(
                 agent_id="agent-1",
                 tool_ids=["user-tool"],
@@ -338,6 +344,9 @@ class TestPrepareChatRun:
         skill.content = "Skill content"
         skill.id = "skill-uuid-1"
 
+        mock_tool_result = MagicMock()
+        mock_tool_result.all.return_value = [("shared-tool", "shared-tool")]
+
         with (
             patch("app.letta_client.get_letta_client", return_value=client),
             patch("app.agents.run_prep.attach_tools_to_agent", new_callable=AsyncMock) as mock_attach,
@@ -353,6 +362,7 @@ class TestPrepareChatRun:
             patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
         ):
             db = AsyncMock()
+            db.execute = AsyncMock(return_value=mock_tool_result)
             await prepare_chat_run(
                 agent_id="agent-1",
                 tool_ids=["shared-tool"],
@@ -366,3 +376,84 @@ class TestPrepareChatRun:
         attached_tool_ids = mock_attach.call_args[0][2]
         # shared-tool should appear only once
         assert attached_tool_ids.count("shared-tool") == 1
+
+
+class TestInjectSkillContextMetadata:
+    """Tests for <skill_state> metadata block injection in inject_skill_context()."""
+
+    @pytest.mark.asyncio
+    async def test_metadata_block_present_with_linked_tools(self):
+        """Metadata block is included when skills have linked tools."""
+        skill = MagicMock()
+        skill.name = "sumologic-search"
+        skill.id = "skill-1"
+        skill.content = "Step 1: Query SumoLogic"
+
+        # Mock get_skill_tool_ids to return tool IDs for this skill
+        # and the DB query to resolve IDs to names
+        mock_tool_result = MagicMock()
+        mock_tool_result.all.return_value = [("tool-uuid-1", "query_sumologic")]
+
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=mock_tool_result)
+
+        with (
+            patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
+            patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=["tool-uuid-1"]),
+        ):
+            result = await inject_skill_context("Hello", [skill], db)
+
+        assert "<skill_state>" in result
+        assert "query_sumologic" in result
+        assert "sumologic-search" in result
+        assert "Hello" in result
+
+    @pytest.mark.asyncio
+    async def test_metadata_block_absent_without_linked_tools(self):
+        """Metadata block is absent when skills have no linked tools."""
+        skill = MagicMock()
+        skill.name = "no-tools-skill"
+        skill.id = "skill-2"
+        skill.content = "Step 1: Do something"
+
+        db = AsyncMock()
+
+        with (
+            patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
+            patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=[]),
+        ):
+            result = await inject_skill_context("Hello", [skill], db)
+
+        assert "<skill_state>" not in result
+        assert "no-tools-skill" in result
+        assert "Hello" in result
+
+    @pytest.mark.asyncio
+    async def test_metadata_block_after_sentinel_before_prompt(self):
+        """Metadata block appears after SKILL_PROMPT_END sentinel and before user prompt."""
+        skill = MagicMock()
+        skill.name = "test-skill"
+        skill.id = "skill-1"
+        skill.content = "Step 1: Do thing"
+
+        mock_tool_result = MagicMock()
+        mock_tool_result.all.return_value = [("tool-uuid-1", "create_timeline")]
+
+        db = AsyncMock()
+        db.execute = AsyncMock(return_value=mock_tool_result)
+
+        with (
+            patch("app.agents.run_prep._fetch_skill_files", new_callable=AsyncMock, return_value={}),
+            patch("app.agents.run_prep.get_skill_tool_ids", new_callable=AsyncMock, return_value=["tool-uuid-1"]),
+        ):
+            result = await inject_skill_context("User message", [skill], db)
+
+        sentinel = "[//skill-context-end]"
+        sentinel_idx = result.index(sentinel)
+        metadata_idx = result.index("<skill_state>")
+        prompt_idx = result.index("User message")
+
+        # Sentinel comes before metadata block
+        assert sentinel_idx < metadata_idx
+        # Metadata block comes before user prompt
+        assert metadata_idx < prompt_idx

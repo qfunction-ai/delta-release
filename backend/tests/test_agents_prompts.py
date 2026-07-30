@@ -5,6 +5,7 @@ from unittest.mock import MagicMock
 from app.agents.prompts import (
     build_lesson_prompt_prefix,
     build_skill_inline_block,
+    build_skill_metadata_block,
     build_skill_prompt_prefix,
     extract_message_parts,
 )
@@ -119,6 +120,68 @@ class TestBuildSkillInlineBlock:
         result = build_skill_inline_block([skill])
         assert "just content" in result
         assert "Skill File" not in result
+
+
+class TestBuildSkillMetadataBlock:
+    """Tests for build_skill_metadata_block."""
+
+    def test_empty_when_no_skills(self):
+        """Returns empty string for empty skill list."""
+        result = build_skill_metadata_block([], {})
+        assert result == ""
+
+    def test_empty_when_no_linked_tools(self):
+        """Returns empty string when skills have no linked tools."""
+        skill = MagicMock()
+        skill.name = "test-skill"
+        skill.id = "skill-1"
+        result = build_skill_metadata_block([skill], {})
+        assert result == ""
+
+    def test_returns_valid_json_with_tools(self):
+        """Returns <skill_state> JSON block when skills have linked tools."""
+        skill = MagicMock()
+        skill.name = "sumologic-search"
+        skill.id = "skill-1"
+        tool_names = {"skill-1": ["query_sumologic", "grep_files"]}
+        result = build_skill_metadata_block([skill], tool_names)
+        assert "<skill_state>" in result
+        assert "</skill_state>" in result
+        assert "query_sumologic" in result
+        assert "grep_files" in result
+        assert "sumologic-search" in result
+
+    def test_multiple_skills(self):
+        """Handles multiple skills with different tools."""
+        s1 = MagicMock()
+        s1.name = "skill-a"
+        s1.id = "id-a"
+        s2 = MagicMock()
+        s2.name = "skill-b"
+        s2.id = "id-b"
+        tool_names = {
+            "id-a": ["tool_a1"],
+            "id-b": ["tool_b1", "tool_b2"],
+        }
+        result = build_skill_metadata_block([s1, s2], tool_names)
+        assert "skill-a" in result
+        assert "skill-b" in result
+        assert "tool_a1" in result
+        assert "tool_b1" in result
+        assert "tool_b2" in result
+
+    def test_skips_skills_with_no_tools(self):
+        """Skills with no linked tools are omitted from the block."""
+        s1 = MagicMock()
+        s1.name = "has-tools"
+        s1.id = "id-1"
+        s2 = MagicMock()
+        s2.name = "no-tools"
+        s2.id = "id-2"
+        tool_names = {"id-1": ["tool1"], "id-2": []}
+        result = build_skill_metadata_block([s1, s2], tool_names)
+        assert "has-tools" in result
+        assert "no-tools" not in result
 
 
 class TestBuildLessonPromptPrefix:

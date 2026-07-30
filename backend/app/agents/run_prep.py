@@ -11,7 +11,12 @@ from app.agents.archival_memory import (
     insert_skills_into_archival_memory,
 )
 from app.agents.lessons import get_lessons_for_workflow
-from app.agents.prompts import build_lesson_prompt_prefix, build_skill_inline_block, build_skill_prompt_prefix
+from app.agents.prompts import (
+    build_lesson_prompt_prefix,
+    build_skill_inline_block,
+    build_skill_metadata_block,
+    build_skill_prompt_prefix,
+)
 from app.agents.skills import get_skill_tool_ids, get_skills_by_ids
 from app.agents.tools import attach_tools_to_agent, ensure_tool_creation
 from app.constants import RUN_PENDING, RUN_RUNNING
@@ -50,7 +55,32 @@ async def inject_skill_context(prompt: str, skills, db) -> str:
     if not skills:
         return prompt
     skill_files = await _fetch_skill_files([str(s.id) for s in skills], db)
-    return build_skill_prompt_prefix([s.name for s in skills]) + build_skill_inline_block(skills, skill_files) + prompt
+
+    # Resolve skill tool IDs to tool names (batch query)
+    from sqlalchemy import select
+
+    from app.tools.models import Tool
+
+    all_tool_ids = []
+    skill_to_tool_ids = {}
+    for s in skills:
+        tool_ids = await get_skill_tool_ids([str(s.id)], db)
+        skill_to_tool_ids[str(s.id)] = tool_ids
+        all_tool_ids.extend(tool_ids)
+
+    skill_tool_names = {}
+    if all_tool_ids:
+        tool_result = await db.execute(select(Tool.id, Tool.name).where(Tool.id.in_(all_tool_ids)))
+        id_to_name = {str(row[0]): row[1] for row in tool_result.all()}
+        for sid, tids in skill_to_tool_ids.items():
+            skill_tool_names[sid] = [id_to_name[str(tid)] for tid in tids if str(tid) in id_to_name]
+
+    return (
+        build_skill_prompt_prefix([s.name for s in skills])
+        + build_skill_inline_block(skills, skill_files)
+        + build_skill_metadata_block(skills, skill_tool_names)
+        + prompt
+    )
 
 
 async def prepare_prompt_context(
