@@ -49,6 +49,7 @@ export default function LogsSection() {
   const [logSearch, setLogSearch] = useState('')
   const [logAutoRefresh, setLogAutoRefresh] = useState(false)
   const [logOffset, setLogOffset] = useState(0)
+  const [exporting, setExporting] = useState(false)
 
   const fetchLogs = useCallback(async (offset = 0) => {
     if (!isAuthenticated) return
@@ -79,6 +80,37 @@ export default function LogsSection() {
       setLogError(ERROR_MESSAGES.CONNECTION)
     } finally {
       setLogLoading(false)
+    }
+  }, [isAuthenticated, logService, logLevel, logSearch])
+
+  const exportLogs = useCallback(async () => {
+    if (!isAuthenticated) return
+    setExporting(true)
+    try {
+      const params = new URLSearchParams()
+      if (logService) params.set('service', logService)
+      if (logLevel) params.set('level', logLevel)
+      if (logSearch) params.set('search', logSearch)
+      params.set('hours', '24')
+
+      const res = await apiFetch(`/api/logs/export?${params}`)
+      if (res.ok) {
+        const blob = await res.blob()
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        const disposition = res.headers.get('content-disposition') || ''
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        a.download = match ? match[1] : 'delta_logs.csv'
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    } catch {
+      // Silently fail — export is a convenience feature
+    } finally {
+      setExporting(false)
     }
   }, [isAuthenticated, logService, logLevel, logSearch])
 
@@ -167,12 +199,21 @@ export default function LogsSection() {
         </div>
       </div>
 
-      {/* Log count */}
+      {/* Log count + export */}
       <div className="logs-count-bar">
         <span className="text-sm text-muted logs-count-text">
           {logTotal} {logTotal === 1 ? 'entry' : 'entries'}
         </span>
-        {logLoading && <LoadingSpinner />}
+        <div className="logs-count-actions">
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={exportLogs}
+            disabled={exporting || logLoading}
+          >
+            {exporting ? 'Exporting...' : 'Export CSV'}
+          </button>
+          {logLoading && <LoadingSpinner />}
+        </div>
       </div>
 
       {/* Log viewer */}

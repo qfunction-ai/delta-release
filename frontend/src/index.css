@@ -2386,6 +2386,12 @@ textarea.input {
   font-family: var(--font-sans);
 }
 
+.logs-count-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .logs-viewer-card {
   padding: 0;
   overflow: hidden;
