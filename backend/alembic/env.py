@@ -1,5 +1,3 @@
-from logging.config import fileConfig
-
 from sqlalchemy import create_engine, pool
 from sqlalchemy.engine import Connection
 
@@ -12,9 +10,13 @@ from app.database import Base
 # this is the Alembic Config object
 config = context.config
 
-# Interpret the config file for Python logging.
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# NOTE: Do NOT call fileConfig(config.config_file_name) here.
+# Alembic's env.py template includes that call to set up logging from
+# alembic.ini, but fileConfig defaults to disable_existing_loggers=True
+# which silently disables every logger not listed in the config —
+# including "app". This kills the RotatingFileHandler on the "app"
+# logger and all runtime log messages stop writing to the log file.
+# Alembic's own log messages propagate through the normal hierarchy.
 
 # Set database URL from settings
 settings = get_settings()
