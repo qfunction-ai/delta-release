@@ -5,6 +5,8 @@ and the Letta security_events table (via the fork's API), parses them,
 and returns structured entries with filtering.
 """
 
+import csv
+import io
 import json
 import logging
 import os
@@ -12,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -409,3 +412,102 @@ async def get_logs(
         "total": total,
         "services": VALID_SERVICES,
     }
+
+
+@router.get("/export")
+async def export_logs(
+    service: str | None = Query(None, description="Filter by service"),
+    level: str | None = Query(None, description="Filter by level"),
+    search: str | None = Query(None, description="Text search in messages"),
+    hours: int = Query(24, le=168, description="Lookback window in hours"),
+    current_user: User = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Export all matching log entries as CSV. Admin-only."""
+    if service and service not in VALID_SERVICES:
+        raise HTTPException(status_code=400, detail=f"Invalid service. Valid: {', '.join(VALID_SERVICES)}")
+    if level and level not in VALID_LEVELS:
+        raise HTTPException(status_code=400, detail=f"Invalid level. Valid: {', '.join(VALID_LEVELS)}")
+
+    all_entries = []
+
+    # Audit logs from DB
+    if not service or service == "audit":
+        audit_entries, _ = await _get_audit_entries(
+            db,
+            hours=hours,
+            level=level,
+            search=search,
+            limit=10000,
+            offset=0,
+        )
+        all_entries.extend(audit_entries)
+
+    # Security events from Letta fork
+    if not service or service == "security":
+        security_entries = await _get_security_entries(
+            hours=hours,
+            level=level,
+            search=search,
+            limit=10000,
+        )
+        all_entries.extend(security_entries)
+
+    # File-based logs
+    if service not in ("audit", "security"):
+        services_to_read = [service] if service and service in LOG_FILES else list(LOG_FILES.keys())
+        for svc in services_to_read:
+            lines = _read_log_file(svc)
+            entries = _parse_file_entries(svc, lines)
+
+            if level:
+                entries = [e for e in entries if e["level"] == level]
+
+            if search:
+                search_lower = search.lower()
+                entries = [e for e in entries if search_lower in e.get("message", "").lower()]
+
+            if hours and entries:
+                cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+                filtered = []
+                for e in entries:
+                    ts = e.get("timestamp")
+                    if ts:
+                        try:
+                            entry_time = datetime.fromisoformat(ts)
+                            if entry_time >= cutoff:
+                                filtered.append(e)
+                        except (ValueError, TypeError):
+                            filtered.append(e)
+                    else:
+                        filtered.append(e)
+                entries = filtered
+
+            all_entries.extend(entries)
+
+    # Sort by timestamp descending
+    all_entries.sort(key=lambda e: e.get("timestamp") or "", reverse=True)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["timestamp", "service", "level", "module", "message"])
+
+    for entry in all_entries:
+        writer.writerow(
+            [
+                entry.get("timestamp") or "",
+                entry.get("service") or "",
+                entry.get("level") or "",
+                entry.get("module") or "",
+                entry.get("message") or "",
+            ]
+        )
+
+    output.seek(0)
+    filename = f"delta_logs_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
