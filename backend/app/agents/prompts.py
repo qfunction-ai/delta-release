@@ -1,5 +1,7 @@
 """Prompt-building helpers — skill/lesson prefixes and message extraction."""
 
+import json
+
 # Sentinel delimiter injected between skill prompt and user message.
 # The history endpoint strips everything before this marker so the
 # user sees their original message, not the skill prompt.
@@ -65,6 +67,32 @@ def build_skill_inline_block(skills: list, skill_files: dict[str, list] | None =
         return ""
 
     return "\n\n".join(blocks) + SKILL_PROMPT_END
+
+
+def build_skill_metadata_block(skills: list, skill_tool_names: dict[str, list[str]]) -> str:
+    """Build a structured metadata block for skill state tracking.
+
+    Args:
+        skills: List of Skill objects
+        skill_tool_names: Dict mapping skill_id (str) -> list of tool names
+
+    Returns:
+        JSON block wrapped in <skill_state> tags, or empty string if no
+        skills have linked tools.
+    """
+    entries = []
+    for skill in skills:
+        tool_names = skill_tool_names.get(str(skill.id), [])
+        if tool_names:
+            entries.append(
+                {
+                    "skill_name": skill.name,
+                    "required_tools": tool_names,
+                }
+            )
+    if not entries:
+        return ""
+    return f"\n<skill_state>\n{json.dumps(entries, indent=2)}\n</skill_state>\n"
 
 
 def build_lesson_prompt_prefix(lesson_count: int) -> str:
