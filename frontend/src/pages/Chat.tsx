@@ -35,6 +35,8 @@ export default function Chat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageIdRef = useRef(0)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isAtBottomRef = useRef(true)
 
   // SSE streaming
   const includeReasoningRef = useRef(includeReasoning)
@@ -71,6 +73,16 @@ export default function Chat() {
         }
         return updated
       })
+      // Auto-deselect skill after response completes — skills are per-message
+      setSelectedSkill(null)
+      if (skillAutoToolsRef.current.length > 0) {
+        setSelectedTools(prev => {
+          const next = new Set(prev)
+          for (const t of skillAutoToolsRef.current) next.delete(t)
+          return next
+        })
+        skillAutoToolsRef.current = []
+      }
     }, []),
     onSecurityEvent: useCallback((_event: string, message: string) => {
       setSecurityWarning(message)
@@ -134,7 +146,9 @@ export default function Chat() {
   }, [agentId, loadHistory])
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (isAtBottomRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
   }, [messages])
 
   const toggleTool = useCallback((id: string) => {
@@ -357,7 +371,7 @@ export default function Chat() {
             ) : (
               skills.map(s => (
                 <label key={s.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontFamily: 'var(--font-sans)', fontSize: '0.75rem', color: selectedSkill === s.id ? 'var(--accent)' : 'var(--text-secondary)', cursor: 'pointer', marginBottom: '0.25rem' }}>
-                  <input type="radio" name="skill" checked={selectedSkill === s.id} onChange={() => toggleSkill(s.id)} style={{ accentColor: 'var(--accent)' }} aria-label={s.name} />
+                  <input type="checkbox" checked={selectedSkill === s.id} onChange={() => toggleSkill(s.id)} style={{ accentColor: 'var(--accent)' }} aria-label={s.name} />
                   <span>{s.name}</span>
                 </label>
               ))
@@ -382,7 +396,16 @@ export default function Chat() {
       )}
 
       {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+      <div
+        ref={scrollContainerRef}
+        onScroll={() => {
+          const el = scrollContainerRef.current
+          if (!el) return
+          const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+          isAtBottomRef.current = distFromBottom < 50
+        }}
+        style={{ flex: 1, overflowY: 'auto', padding: '1.5rem 2rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}
+      >
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', marginTop: '3rem' }}>
             <div style={{ fontFamily: 'var(--font-sans)', fontSize: '3rem', color: 'var(--accent)', opacity: 0.15, marginBottom: '1rem' }}>f(x)</div>
