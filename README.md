@@ -2,6 +2,8 @@
 
 Self-hosted cybersecurity workflow automation powered by Letta agents.
 
+[![Test](https://github.com/qfunction-ai/delta/actions/workflows/test.yml/badge.svg)](https://github.com/qfunction-ai/delta/actions/workflows/test.yml)
+
 ## Architecture
 
 ```
@@ -57,7 +59,7 @@ docker compose up -d
 docker compose ps  # wait for all services healthy
 ```
 
-Secrets (JWT, encryption key, service token) are auto-generated on first run and persisted to a Docker volume. No `.env` configuration required for local use. Edit `.env` to override defaults.
+Secrets (JWT, encryption key, service token) are auto-generated on first run and persisted to a Docker volume. No `.env` configuration required for local use. See `.env.example` for optional settings.
 
 ### 2. Login
 
@@ -93,7 +95,9 @@ Python functions that agents call during execution. Tools are written with type-
 
 ### Skills
 
-Instruction documents (SKILL.md) that guide agent behavior. Skills are uploaded as `.zip` packages, imported from GitHub, or created manually. At workflow runtime, skill content is injected into the agent's archival memory and discovered via `archival_memory_search`.
+Instruction documents (SKILL.md) that guide agent behavior. Skills are uploaded as `.zip` packages, imported from GitHub, or created manually. At runtime, skill content is injected inline into the user's message — the agent receives the full skill instructions directly, not via archival memory retrieval.
+
+**Skill selection in Chat:** Skills are selected via checkboxes in the Chat Config panel. A selected skill stays selected across messages — important for multi-step skills that require back-and-forth conversation (e.g., the agent asks for a query and timerange, the user provides them, the agent continues). Uncheck the skill when done. The agent is instructed to respond directly to general questions unrelated to a skill, even when a skill is selected. For cleanest results, deselect the skill before asking general questions.
 
 **Required-tool enforcement:** When a skill has linked tools (via the skill-tool join table), Delta injects a `<skill_state>` metadata block into the user message. The Letta Local fork parses this block and registers `RequiredBeforeExitToolRule` entries for each linked tool. This prevents the agent from stopping mid-skill — if the agent calls `send_message` (a terminal tool) before all required tools have been called, the harness forces the loop to continue with a heartbeat message listing the uncalled tools. The metadata block is stripped from the message before the LLM sees it.
 
@@ -111,7 +115,7 @@ The execution unit — a prompt template bound to an agent, with optional tools 
 
 ### Tool Proposals
 
-When the `agent_tool_creation` setting is enabled, agents can propose new tools at runtime. The agent calls `propose_tool` with a name, description, source code, and JSON schema. The proposal enters a pending state with dry-run results, requiring human review and approval before activation. Enabling this setting also attaches the `fetch_docs` tool, which lets agents fetch documentation from allowed domains before proposing tools. Agents are instructed to never guess API signatures from memory — they must fetch documentation first or tell the operator that documentation could not be retrieved.
+When the `agent_tool_creation` setting is enabled, agents can propose new tools at runtime. The agent calls `propose_tool` with a name, description, source code, and JSON schema. The proposal enters a pending state with dry-run results, requiring human review and approval before activation. Enabling this setting also attaches three companion tools: `fetch_docs` (fetches documentation from allowed domains with SSRF protection), `list_github_repo` (lists the file tree of a public GitHub repository), and `read_github_file` (reads raw file content from GitHub with optional line ranges). Agents are instructed to never guess API signatures from memory — they must fetch documentation first or tell the operator that documentation could not be retrieved.
 
 ### Credentials
 
@@ -119,7 +123,7 @@ Encrypted storage for security platform API keys. Supported providers include Sp
 
 ### Chat
 
-Ad-hoc agent conversations at `/chat`. Select any agent, attach tools and skills, toggle reasoning. Real-time SSE streaming with character-by-character animation.
+Ad-hoc agent conversations at `/chat`. Select any agent, attach tools and select skills via the Config panel (gear icon), toggle reasoning. Real-time SSE streaming with character-by-character animation. The chat auto-scrolls to bottom only when the user is already near the bottom — scrolling up during a streaming response stays in place.
 
 ### Observability
 
@@ -149,11 +153,20 @@ Agent quality evaluation using deterministic and LLM-based checks. The eval runn
 docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d
 ```
 
-Deterministic check types include `StringMatching`, `RegexMatching`, `Equals`, `NotEquals`, and `FnCheck`. LLM-based types include `Conformity` and `LLMJudge` (requires Ollama). Evals are accessible via the API at `/api/evals`.
+Deterministic check types include `StringMatching`, `RegexMatching`, `Equals`, `NotEquals`, and `FnCheck`. LLM-based types include `Conformity` and `LLMJudge` (requires Ollama). Scenarios are defined as YAML files in `evals/scenarios/`. 38 scenarios across six categories: behavioral safety, tool safety, skill management, docs fetch, security enforcement, and data exfiltration prevention. Evals are CLI/CI-first — no UI.
+
+```bash
+# Single scenario (live agent)
+python cli/delta_eval.py evals/scenarios/safety_guardrails.yaml \
+  --agent AGENT_ID --username USER --password PASS
+
+# Mock mode (CI — no LLM needed, deterministic)
+python cli/delta_eval.py evals/scenarios/safety_guardrails.yaml --mock
+```
 
 ### Settings
 
-User settings that gate agent capabilities. Controls `agent_tool_creation` (tool proposal and documentation fetching toggle). Admin page at `/settings` also provides package management (pip install/uninstall to shared volume) and credential management.
+User settings that gate agent capabilities. Controls `agent_tool_creation` (tool proposal, documentation fetching, and GitHub repository reading toggle). Admin page at `/settings` provides six sections: Packages (pip install/uninstall to shared volume), Credentials (encrypted API key storage), Agent (tool creation toggle, allowed domains, memory management), Logs (service logs with filtering and CSV export), Backup (export/import tools, skills, and workflows as JSON), and Infrastructure (service health status).
 
 ## API
 
@@ -175,8 +188,26 @@ The backend exposes a REST API at `http://localhost:8000/api/`. All endpoints re
 | Docs | `/api/docs` | SSRF-safe documentation fetch for agents |
 | Audit | `/api/audit-logs` | List, export CSV, stats |
 | Dashboard | `/api/dashboard` | Overview (agents, stats, health, recent runs) |
-| Logs | `/api/logs` | View logs from all services (admin only) |
+| Logs | `/api/logs` | View logs from all services, export CSV (admin only) |
 | Observability | `/api/observability` | Traces, security events, service logs |
+
+## Testing
+
+**1,270 tests** — 825 backend unit/integration + 129 E2E + 316 frontend.
+
+```bash
+# Backend unit + integration (SQLite in-memory, no external services)
+docker compose exec backend python -m pytest tests/ -v --ignore=tests/e2e
+
+# Frontend (jsdom, no browser needed)
+npx vitest run
+
+# E2E (requires full Docker stack with CI fake-Letta-Local)
+DELTA_E2E=1 docker compose -f docker-compose.yml -f docker-compose.ci.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.ci.yml exec backend env DELTA_E2E=1 python -m pytest tests/e2e/ -v
+```
+
+CI runs on push and PR via GitHub Actions with five parallel jobs: `aislop` (quality gate), `lint` (ruff), `test` (backend), `e2e`, and `frontend-test`. The backend Docker image bakes dev dependencies (ruff, pytest, coverage) at build time via `INCLUDE_DEV=1` build arg to avoid runtime pip installs in the read-only rootfs.
 
 ## Security
 
@@ -194,7 +225,7 @@ The backend exposes a REST API at `http://localhost:8000/api/`. All endpoints re
 
 All variables use the `DELTA_` prefix. Docker Compose maps them from `.env`.
 
-**Auto-generated on first run** (no `.env` editing required for local use):
+**Auto-generated on first run** (no `.env` required for local use):
 
 | Variable | Description |
 |----------|-------------|
