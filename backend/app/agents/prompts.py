@@ -24,7 +24,9 @@ def build_skill_prompt_prefix(skill_names: list[str]) -> str:
         f"2. If a skill references tools you do not have, say so — do not guess.\n"
         f"3. After completing all steps in a skill, report your findings.\n"
         f"4. For general questions unrelated to a skill, respond directly.\n"
-        f"5. NEVER stop mid-skill after a tool call returns. If a skill has multiple steps,\n"
+        f"5. A skill is provided for THIS message only. If the user's next message does not\n"
+        f"   include skill context, the skill is not active — do not run skill steps.\n"
+        f"6. NEVER stop mid-skill after a tool call returns. If a skill has multiple steps,\n"
         f"   you MUST continue to the next step immediately. Do not summarize and stop.\n"
         f"\n"
     )
