@@ -73,16 +73,6 @@ export default function Chat() {
         }
         return updated
       })
-      // Auto-deselect skill after response completes — skills are per-message
-      setSelectedSkill(null)
-      if (skillAutoToolsRef.current.length > 0) {
-        setSelectedTools(prev => {
-          const next = new Set(prev)
-          for (const t of skillAutoToolsRef.current) next.delete(t)
-          return next
-        })
-        skillAutoToolsRef.current = []
-      }
     }, []),
     onSecurityEvent: useCallback((_event: string, message: string) => {
       setSecurityWarning(message)
