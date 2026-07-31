@@ -58,6 +58,7 @@ describe('Help', () => {
     expect(screen.getAllByText('Workflows').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Observability').length).toBeGreaterThanOrEqual(1)
     expect(screen.getAllByText('Settings').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getAllByText('FAQ').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders section content headings', () => {
