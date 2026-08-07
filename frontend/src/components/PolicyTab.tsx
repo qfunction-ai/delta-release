@@ -6,7 +6,7 @@ import type { ToolCallPolicy, PolicyRule, PolicyDecision } from '../lib/types'
 
 const ACTIONS = ['allow', 'deny', 'require_approval', 'audit'] as const
 const OPERATORS = ['eq', 'ne', 'gt', 'lt', 'gte', 'lte', 'in', 'not_in', 'matches', 'contains'] as const
-const CONDITION_FIELDS = ['tool_name', 'tool_args', 'tool_call_count', 'actor_id', 'agent_id'] as const
+const CONDITION_FIELDS = ['tool_name', 'tool_args', 'tool_call_count', 'actor_id'] as const
 
 interface Props {
   agentId: string
