@@ -3,7 +3,6 @@
 import asyncio
 import json
 import logging
-import re
 from functools import partial
 from typing import AsyncGenerator
 
@@ -13,30 +12,6 @@ logger = logging.getLogger(__name__)
 
 # Exceptions that are transient and worth retrying
 TRANSIENT_EXCEPTIONS = (ConnectionError, OSError, TimeoutError)
-
-# Canary output filter — pattern-based scanning for CANARY-<uuid> in streaming content.
-# The prefix CANARY- alone is not a secret; the full UUID is. Pattern matching catches
-# any canary leak regardless of whether we know the specific token value.
-_CANARY_PATTERN = re.compile(
-    r"CANARY-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-    re.IGNORECASE,
-)
-
-_REDACTED_CANARY = "[REDACTED_CANARY]"
-
-_CANARY_SECURITY_WARNING = (
-    "\n\n[SECURITY WARNING: A prompt exfiltration attempt was detected "
-    "and blocked. The canary token embedded in the system prompt was "
-    "found in this message.]"
-)
-
-
-def scan_and_redact_canary(content: str) -> tuple[str, bool]:
-    """Scan content for canary token pattern. Returns (redacted_content, was_detected)."""
-    if _CANARY_PATTERN.search(content):
-        redacted = _CANARY_PATTERN.sub(_REDACTED_CANARY, content)
-        return redacted + _CANARY_SECURITY_WARNING, True
-    return content, False
 
 
 async def run_sync(func, *args, **kwargs):
@@ -204,16 +179,7 @@ async def stream_letta_response(
 
             if content:
                 if msg_type == "assistant_message":
-                    # Security: scan for canary token leaks in assistant messages
-                    content_str = str(content)
-                    redacted, detected = scan_and_redact_canary(content_str)
-                    if detected:
-                        yield {
-                            "type": "security_event",
-                            "event": "canary_output_detected",
-                            "message": "Canary token detected in assistant output and redacted",
-                        }
-                    yield {"type": "content", "content": redacted, "message_type": msg_type}
+                    yield {"type": "content", "content": str(content), "message_type": msg_type}
                 elif msg_type == "reasoning_message":
                     yield {"type": "reasoning", "content": str(content), "message_type": msg_type}
 
