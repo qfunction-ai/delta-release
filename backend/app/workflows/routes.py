@@ -173,9 +173,13 @@ async def update_workflow(
     """Update a workflow."""
     workflow = await get_owned_or_404(db, Workflow, workflow_id, current_user.id)
 
-    # Handle schedule changes — reschedule if cron, prompt, or variables change
+    # Handle schedule changes — reschedule if cron, prompt, or variables change.
+    # model_fields_set distinguishes "field absent from request" (leave schedule
+    # alone) from "field explicitly null" (remove the existing schedule).
+    cron_provided = "schedule_cron" in workflow_data.model_fields_set
     needs_reschedule = (
         workflow_data.schedule_cron is not None
+        or (cron_provided and workflow.schedule_cron)
         or (workflow_data.prompt_template is not None and workflow.schedule_cron)
         or (workflow_data.default_variables is not None and workflow.schedule_cron)
     )
@@ -223,7 +227,15 @@ async def update_workflow(
 
         workflow.schedule_cron = workflow_data.schedule_cron
 
-    if workflow_data.name is not None:
+    if workflow_data.name is not None and workflow_data.name != workflow.name:
+        await check_unique_for_user(
+            db,
+            Workflow,
+            current_user.id,
+            "name",
+            workflow_data.name,
+            exclude_id=workflow.id,
+        )
         workflow.name = workflow_data.name
     if workflow_data.description is not None:
         workflow.description = workflow_data.description

@@ -1,14 +1,16 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import WorkflowForm from '../WorkflowForm'
-import { Agent, Tool, Skill } from '../../lib/types'
+import { Agent, Tool, Skill, Workflow } from '../../lib/types'
 
 // Mock apiFetch
 vi.mock('../../lib/api', () => ({
   apiFetch: vi.fn(),
   extractApiError: vi.fn(),
 }))
+
+import { apiFetch } from '../../lib/api'
 
 vi.mock('../../lib/errors', () => ({
   ERROR_MESSAGES: { CONNECTION: 'Connection failed' },
@@ -39,8 +41,8 @@ const mockTools: Tool[] = [
 ]
 
 const mockSkills: Skill[] = [
-  { id: 'skill-1', name: 'Threat Intel', description: 'Threat intelligence lookup', source: 'manual', file_path: '/skills/threat-intel/SKILL.md', created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z' },
-  { id: 'skill-2', name: 'Log Analysis', description: 'Analyze log files', source: 'manual', file_path: '/skills/log-analysis/SKILL.md', created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z' },
+  { id: 'skill-1', name: 'Threat Intel', description: 'Threat intelligence lookup', source: 'manual', file_path: '/skills/threat-intel/SKILL.md', tool_ids: [], created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z' },
+  { id: 'skill-2', name: 'Log Analysis', description: 'Analyze log files', source: 'manual', file_path: '/skills/log-analysis/SKILL.md', tool_ids: [], created_at: '2025-01-01T00:00:00Z', updated_at: '2025-01-01T00:00:00Z' },
 ]
 
 describe('WorkflowForm', () => {
@@ -169,5 +171,148 @@ describe('WorkflowForm', () => {
     expect(checkbox).not.toBeChecked()
     await user.click(checkbox)
     expect(checkbox).toBeChecked()
+  })
+})
+
+describe('WorkflowForm edit mode', () => {
+  beforeEach(() => {
+    vi.mocked(apiFetch).mockReset()
+  })
+
+  const mockWorkflow: Workflow = {
+    id: 'wf-1',
+    name: 'Daily Scan',
+    agent_id: 'letta-2',
+    description: 'Run daily scan',
+    prompt_template: 'Scan {{target}}',
+    tool_ids: ['tool-1'],
+    skill_ids: null,
+    schedule_cron: '0 9 * * *',
+    default_variables: { target: 'prod' },
+    include_reasoning: true,
+    created_at: '2025-01-01T00:00:00Z',
+  }
+
+  it('renders pre-filled values and Edit Workflow heading', () => {
+    render(
+      <WorkflowForm
+        agents={mockAgents}
+        tools={mockTools}
+        skills={mockSkills}
+        onCreated={vi.fn()}
+        workflow={mockWorkflow}
+        onUpdated={vi.fn()}
+        onCancelEdit={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Edit Workflow')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Daily Scan')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Run daily scan')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Scan {{target}}')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('0 9 * * *')).toBeInTheDocument()
+    expect(screen.getByLabelText('search_splunk')).toBeChecked()
+    expect(screen.getByLabelText('Include Reasoning')).toBeChecked()
+    // Default variables textarea is visible when a schedule is pre-filled
+    expect(screen.getByLabelText(/Default Variables/)).toBeInTheDocument()
+  })
+
+  it('submit issues PUT to the workflow endpoint', async () => {
+    const onUpdated = vi.fn()
+    const user = userEvent.setup()
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as unknown as Response)
+
+    render(
+      <WorkflowForm
+        agents={mockAgents}
+        tools={mockTools}
+        skills={mockSkills}
+        onCreated={vi.fn()}
+        workflow={mockWorkflow}
+        onUpdated={onUpdated}
+        onCancelEdit={vi.fn()}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/workflows/wf-1',
+      expect.objectContaining({ method: 'PUT' })
+    )
+    const body = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]!.body as string)
+    expect(body.name).toBe('Daily Scan')
+    expect(body.schedule_cron).toBe('0 9 * * *')
+    expect(onUpdated).toHaveBeenCalled()
+  })
+
+  it('submit sends schedule_cron null when the field is cleared', async () => {
+    const user = userEvent.setup()
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as unknown as Response)
+
+    render(
+      <WorkflowForm
+        agents={mockAgents}
+        tools={mockTools}
+        skills={mockSkills}
+        onCreated={vi.fn()}
+        workflow={mockWorkflow}
+        onUpdated={vi.fn()}
+        onCancelEdit={vi.fn()}
+      />
+    )
+
+    const cronInput = screen.getByLabelText(/Schedule/)
+    await user.clear(cronInput)
+    await user.click(screen.getByRole('button', { name: 'Save Changes' }))
+
+    const body = JSON.parse(vi.mocked(apiFetch).mock.calls[0][1]!.body as string)
+    expect('schedule_cron' in body).toBe(true)
+    expect(body.schedule_cron).toBeNull()
+  })
+
+  it('cancel button calls onCancelEdit', async () => {
+    const onCancelEdit = vi.fn()
+    const user = userEvent.setup()
+
+    render(
+      <WorkflowForm
+        agents={mockAgents}
+        tools={mockTools}
+        skills={mockSkills}
+        onCreated={vi.fn()}
+        workflow={mockWorkflow}
+        onUpdated={vi.fn()}
+        onCancelEdit={onCancelEdit}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onCancelEdit).toHaveBeenCalledTimes(1)
+  })
+
+  it('create mode is unaffected — no Cancel button, POST endpoint', async () => {
+    const user = userEvent.setup()
+    vi.mocked(apiFetch).mockResolvedValue({ ok: true, json: async () => ({}) } as unknown as Response)
+
+    render(
+      <WorkflowForm
+        agents={mockAgents}
+        tools={mockTools}
+        skills={mockSkills}
+        onCreated={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+
+    await user.type(screen.getByLabelText(/Name/), 'New workflow')
+    await user.type(screen.getByLabelText(/Prompt Template/), 'Do things')
+    await user.click(screen.getByRole('button', { name: 'Create Workflow' }))
+
+    expect(apiFetch).toHaveBeenCalledWith(
+      '/api/workflows/',
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 })
