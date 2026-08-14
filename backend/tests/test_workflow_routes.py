@@ -383,6 +383,62 @@ class TestWorkflowUpdateSchedule:
         assert resp.status_code == 200
         assert resp.json()["schedule_cron"] == "0 */2 * * *"
 
+    async def test_update_workflow_clear_cron_unschedules(self, registered_client, mock_letta_client):
+        """PUT with explicit schedule_cron: null removes the APScheduler job."""
+        client, headers, _ = registered_client
+        agent_id = await _create_agent_via_api(client, headers, mock_letta_client, "cron-clear-agent")
+
+        with patch("app.workflows.routes.schedule_workflow", new_callable=AsyncMock):
+            resp = await client.post(
+                "/api/workflows/",
+                headers=headers,
+                json={
+                    "name": "cron-clear-wf",
+                    "agent_id": agent_id,
+                    "prompt_template": "Scheduled",
+                    "schedule_cron": "0 * * * *",
+                },
+            )
+        wf_id = resp.json()["id"]
+
+        with patch("app.workflows.routes.unschedule_workflow") as mock_unschedule:
+            resp = await client.put(
+                f"/api/workflows/{wf_id}",
+                headers=headers,
+                json={"schedule_cron": None},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["schedule_cron"] is None
+        mock_unschedule.assert_called_once()
+
+    async def test_update_workflow_absent_cron_field_no_reschedule(self, registered_client, mock_letta_client):
+        """PUT without a schedule_cron key leaves the schedule untouched."""
+        client, headers, _ = registered_client
+        agent_id = await _create_agent_via_api(client, headers, mock_letta_client, "cron-absent-agent")
+
+        with patch("app.workflows.routes.schedule_workflow", new_callable=AsyncMock):
+            resp = await client.post(
+                "/api/workflows/",
+                headers=headers,
+                json={
+                    "name": "cron-absent-wf",
+                    "agent_id": agent_id,
+                    "prompt_template": "Scheduled",
+                    "schedule_cron": "0 * * * *",
+                },
+            )
+        wf_id = resp.json()["id"]
+
+        with patch("app.workflows.routes.unschedule_workflow") as mock_unschedule:
+            resp = await client.put(
+                f"/api/workflows/{wf_id}",
+                headers=headers,
+                json={"description": "updated description"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["schedule_cron"] == "0 * * * *"
+        mock_unschedule.assert_not_called()
+
     async def test_update_workflow_remove_cron(self, registered_client, mock_letta_client):
         """PUT /api/workflows/{id} with schedule_cron change triggers reschedule."""
         client, headers, _ = registered_client
@@ -435,3 +491,47 @@ class TestWorkflowSkillValidation:
             },
         )
         assert resp.status_code in (400, 403)
+
+    async def test_update_workflow_duplicate_name_409(self, registered_client, mock_letta_client):
+        """Renaming a workflow to another workflow's name returns 409, not 500."""
+        client, headers, _ = registered_client
+        agent_id = await _create_agent_via_api(client, headers, mock_letta_client, "dup-name-agent")
+
+        resp = await client.post(
+            "/api/workflows/",
+            headers=headers,
+            json={"name": "dup-name-first", "agent_id": agent_id, "prompt_template": "One"},
+        )
+        resp = await client.post(
+            "/api/workflows/",
+            headers=headers,
+            json={"name": "dup-name-second", "agent_id": agent_id, "prompt_template": "Two"},
+        )
+        wf2_id = resp.json()["id"]
+
+        resp = await client.put(
+            f"/api/workflows/{wf2_id}",
+            headers=headers,
+            json={"name": "dup-name-first"},
+        )
+        assert resp.status_code == 409
+
+    async def test_update_workflow_same_name_ok(self, registered_client, mock_letta_client):
+        """Updating a workflow without changing its name does not conflict."""
+        client, headers, _ = registered_client
+        agent_id = await _create_agent_via_api(client, headers, mock_letta_client, "same-name-agent")
+
+        resp = await client.post(
+            "/api/workflows/",
+            headers=headers,
+            json={"name": "same-name-wf", "agent_id": agent_id, "prompt_template": "Original"},
+        )
+        wf_id = resp.json()["id"]
+
+        resp = await client.put(
+            f"/api/workflows/{wf_id}",
+            headers=headers,
+            json={"name": "same-name-wf", "description": "updated"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "same-name-wf"

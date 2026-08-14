@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import Workflows from '../Workflows'
 
@@ -162,6 +162,33 @@ describe('Workflows page', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+    })
+  })
+
+  it('shows edit button on workflow cards', async () => {
+    setupFetchMocks()
+    renderWorkflows()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    })
+  })
+
+  it('clicking Edit opens the form pre-filled with the workflow', async () => {
+    setupFetchMocks()
+    renderWorkflows()
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+
+    await waitFor(() => {
+      expect(screen.getByText('Edit Workflow')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('daily-scan')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('Scan {{target}}')).toBeInTheDocument()
+      expect(screen.getByDisplayValue('0 9 * * *')).toBeInTheDocument()
     })
   })
 

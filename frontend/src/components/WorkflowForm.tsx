@@ -8,18 +8,23 @@ interface WorkflowFormProps {
   tools: Tool[]
   skills: Skill[]
   onCreated: (workflow: Workflow) => void
+  /** When provided, the form edits this workflow instead of creating a new one. */
+  workflow?: Workflow | null
+  onUpdated?: () => void
+  onCancelEdit?: () => void
 }
 
-export default function WorkflowForm({ agents, tools, skills, onCreated }: WorkflowFormProps) {
-  const [name, setName] = useState('')
-  const [agentId, setAgentId] = useState(agents.length > 0 ? agents[0].letta_agent_id : '')
-  const [description, setDescription] = useState('')
-  const [promptTemplate, setPromptTemplate] = useState('')
-  const [selectedTools, setSelectedTools] = useState<string[]>([])
-  const [selectedSkills, setSelectedSkills] = useState<string[]>([])
-  const [scheduleCron, setScheduleCron] = useState('')
-  const [defaultVariables, setDefaultVariables] = useState<Record<string, string>>({})
-  const [includeReasoning, setIncludeReasoning] = useState(false)
+export default function WorkflowForm({ agents, tools, skills, onCreated, workflow, onUpdated, onCancelEdit }: WorkflowFormProps) {
+  const isEdit = workflow != null
+  const [name, setName] = useState(workflow?.name ?? '')
+  const [agentId, setAgentId] = useState(workflow?.agent_id ?? (agents.length > 0 ? agents[0].letta_agent_id : ''))
+  const [description, setDescription] = useState(workflow?.description ?? '')
+  const [promptTemplate, setPromptTemplate] = useState(workflow?.prompt_template ?? '')
+  const [selectedTools, setSelectedTools] = useState<string[]>(workflow?.tool_ids ?? [])
+  const [selectedSkills, setSelectedSkills] = useState<string[]>(workflow?.skill_ids ?? [])
+  const [scheduleCron, setScheduleCron] = useState(workflow?.schedule_cron ?? '')
+  const [defaultVariables, setDefaultVariables] = useState<Record<string, string>>(workflow?.default_variables ?? {})
+  const [includeReasoning, setIncludeReasoning] = useState(workflow?.include_reasoning ?? false)
   const [creating, setCreating] = useState(false)
   const [error, setError] = useState('')
   const [jsonError, setJsonError] = useState('')
@@ -50,36 +55,49 @@ export default function WorkflowForm({ agents, tools, skills, onCreated }: Workf
     setCreating(true)
 
     try {
-      const response = await apiFetch('/api/workflows/', {
-        method: 'POST',
-        body: JSON.stringify({
-          name,
-          agent_id: agentId,
-          description,
-          prompt_template: promptTemplate,
-          tool_ids: selectedTools.length > 0 ? selectedTools : null,
-          skill_ids: selectedSkills.length > 0 ? selectedSkills : null,
-          schedule_cron: scheduleCron.trim() || null,
-          default_variables: Object.keys(defaultVariables).length > 0 ? defaultVariables : null,
-          include_reasoning: includeReasoning,
-        }),
-      })
+      // schedule_cron must always be present in the body — an explicit null
+      // is how the backend distinguishes "clear the schedule" from "leave it
+      // alone" (Pydantic model_fields_set).
+      const body = {
+        name,
+        agent_id: agentId,
+        description,
+        prompt_template: promptTemplate,
+        tool_ids: selectedTools.length > 0 ? selectedTools : null,
+        skill_ids: selectedSkills.length > 0 ? selectedSkills : null,
+        schedule_cron: scheduleCron.trim() || null,
+        default_variables: Object.keys(defaultVariables).length > 0 ? defaultVariables : null,
+        include_reasoning: includeReasoning,
+      }
+
+      const response = await apiFetch(
+        isEdit ? `/api/workflows/${workflow.id}` : '/api/workflows/',
+        {
+          method: isEdit ? 'PUT' : 'POST',
+          body: JSON.stringify(body),
+        }
+      )
 
       if (!response.ok) {
-        setError(await extractApiError(response, 'Failed to create workflow'))
+        setError(await extractApiError(response, isEdit ? 'Failed to update workflow' : 'Failed to create workflow'))
         return
       }
 
-      const newWorkflow = await response.json()
-      onCreated(newWorkflow)
-      setName('')
-      setDescription('')
-      setPromptTemplate('')
-      setSelectedTools([])
-      setSelectedSkills([])
-      setScheduleCron('')
-      setDefaultVariables({})
-      setIncludeReasoning(false)
+      if (isEdit) {
+        onUpdated?.()
+        // Parent exits edit mode (remounts the form); no field reset needed.
+      } else {
+        const newWorkflow = await response.json()
+        onCreated(newWorkflow)
+        setName('')
+        setDescription('')
+        setPromptTemplate('')
+        setSelectedTools([])
+        setSelectedSkills([])
+        setScheduleCron('')
+        setDefaultVariables({})
+        setIncludeReasoning(false)
+      }
     } catch {
       setError(ERROR_MESSAGES.CONNECTION)
     } finally {
@@ -89,7 +107,7 @@ export default function WorkflowForm({ agents, tools, skills, onCreated }: Workf
 
   return (
     <div className="card mb-6">
-      <h2 className="section-header" data-symbol="+">Create Workflow</h2>
+      <h2 className="section-header" data-symbol={isEdit ? '∂' : '+'}>{isEdit ? 'Edit Workflow' : 'Create Workflow'}</h2>
 
       <form onSubmit={handleSubmit}>
         <div className="form-group">
@@ -288,14 +306,25 @@ export default function WorkflowForm({ agents, tools, skills, onCreated }: Workf
 
         {error && <div className="error">{error}</div>}
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={creating || !name || !promptTemplate || !agentId}
-          style={{ marginTop: '1rem' }}
-        >
-          {creating ? 'Creating...' : 'Create Workflow'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={creating || !name || !promptTemplate || !agentId}
+          >
+            {creating ? (isEdit ? 'Saving...' : 'Creating...') : (isEdit ? 'Save Changes' : 'Create Workflow')}
+          </button>
+          {isEdit && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onCancelEdit}
+              disabled={creating}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
       </form>
     </div>
   )

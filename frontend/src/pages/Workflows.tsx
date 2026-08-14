@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { apiFetch } from '../lib/api'
 import { ERROR_MESSAGES } from '../lib/errors'
 import { useRequireAuth } from '../hooks/useRequireAuth'
@@ -32,6 +32,22 @@ export default function Workflows() {
 
   // View state — which workflow is selected
   const [viewingWorkflow, setViewingWorkflow] = useState<WorkflowDetail | null>(null)
+
+  // Edit state — which workflow the form is editing (null = create mode)
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null)
+  const formRef = useRef<HTMLDivElement>(null)
+
+  const handleEdit = (workflow: Workflow) => {
+    setEditingWorkflow(workflow)
+    // Optional call — jsdom does not implement scrollIntoView
+    formRef.current?.scrollIntoView?.({ behavior: 'smooth' })
+  }
+
+  const handleEditComplete = () => {
+    setEditingWorkflow(null)
+    fetchData()
+    if (viewingWorkflow) handleView(viewingWorkflow.id)
+  }
 
   const handleDelete = useEntityDelete(
     '/api/workflows',
@@ -107,12 +123,16 @@ export default function Workflows() {
 
       <div className="two-column">
         {/* Left column: Create + List */}
-        <div>
+        <div ref={formRef}>
           <WorkflowForm
+            key={editingWorkflow?.id ?? 'new'}
             agents={agents}
             tools={tools}
             skills={skills}
             onCreated={handleWorkflowCreated}
+            workflow={editingWorkflow}
+            onUpdated={handleEditComplete}
+            onCancelEdit={() => setEditingWorkflow(null)}
           />
 
           {/* Workflows List */}
@@ -164,12 +184,20 @@ export default function Workflows() {
                         ) : null })()}
                       </div>
                     </div>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={(e) => { e.stopPropagation(); handleDelete(workflow.id, workflow.name) }}
-                    >
-                      Delete
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.375rem' }}>
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={(e) => { e.stopPropagation(); handleEdit(workflow) }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={(e) => { e.stopPropagation(); handleDelete(workflow.id, workflow.name) }}
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
