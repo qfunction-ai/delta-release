@@ -278,3 +278,11 @@ docker compose down -v && docker compose up -d
 ```
 
 This removes all volumes (databases, agent data, credentials) and recreates everything. See [Managing Your Data](#managing-your-data) for the difference between `down` and `down -v`.
+
+## License
+
+Delta is licensed under the [Apache License 2.0](LICENSE).
+
+## Contributing
+
+Contributions are welcome. By submitting a pull request, you agree to the terms of our [Contributor License Agreement](CLA.md). First-time contributors should review and acknowledge the CLA before submitting.
