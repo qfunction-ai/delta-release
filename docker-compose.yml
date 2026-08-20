@@ -150,9 +150,12 @@ services:
   # Uses external Postgres + Redis (no internal services).
   # Runs as non-root (UID 1000) with no capabilities.
   letta:
-    # Letta Local fork v0.16.11 (commit a5b2b39)
+    # Pinned to 0.16.23:
+    #   0.16.22: streaming UnboundLocalError fix (V3 stream _ah shadow)
+    #   0.16.23: reset-messages soft-delete, policy rule-name errors,
+    #            agent-delete CASCADE fix, Dockerfile self-contained install
     # Update: docker compose pull letta && docker compose up -d
-    image: ghcr.io/qfunction-ai/letta-local:latest
+    image: ghcr.io/qfunction-ai/letta-local:0.16.23
     user: "1000:1000"
     read_only: true
     ports:
