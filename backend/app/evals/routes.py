@@ -71,7 +71,7 @@ async def _call_eval_container(
         # Use the Docker service name, not localhost.
         payload["backend_url"] = settings.backend_url
 
-    headers = {"X-Service-Token": settings.service_token}
+    headers = {"X-Service-Token": settings.eval_service_token}
 
     try:
         async with httpx.AsyncClient(timeout=EVAL_CONTAINER_TIMEOUT) as client:

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_user, resolve_agent_user, verify_service_token
+from app.auth.dependencies import get_current_user, resolve_agent_user, verify_eval_service_token
 from app.auth.models import User
 from app.database import get_db
 from app.settings.models import UserSettings
@@ -53,7 +53,7 @@ async def eval_update_settings(
     request: Request,
     settings_data: UserSettingsUpdate,
     agent_id: str = Query("", alias="agent_id"),
-    _auth=Depends(verify_service_token),
+    _auth=Depends(verify_eval_service_token),
     db: AsyncSession = Depends(get_db),
 ):
     """Service-to-service settings update for the eval container.

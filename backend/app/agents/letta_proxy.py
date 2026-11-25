@@ -24,6 +24,7 @@ from fastapi.responses import Response
 from app.agents.models import Agent
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
+from app.config import get_settings
 from app.database import get_db, get_owned_or_404
 from app.letta_client import LETTA_PROXY_TIMEOUT, letta_base_url
 
@@ -86,6 +87,14 @@ async def _proxy_request(
         ct = request.headers.get("content-type")
         if ct:
             headers["content-type"] = ct
+
+    # v0.16.39 adoption: authenticate to the Letta server when a password
+    # is configured (the fork's CheckPasswordMiddleware accepts
+    # Authorization: Bearer). Empty password = unauthenticated server
+    # (fake-letta CI, pre-0.16.39 pins) — no header, keeps working.
+    server_password = get_settings().letta_server_password
+    if server_password:
+        headers["Authorization"] = f"Bearer {server_password}"
 
     body = await request.body() if request else None
 

@@ -18,12 +18,15 @@ class TestGetUserIdentifier:
         result = get_user_identifier(request)
         assert result == "user:user-123"
 
-    def test_forwarded_for_header(self):
+    def test_forwarded_for_header_is_ignored(self):
+        """F1: X-Forwarded-For must NOT be trusted — client.host is the fallback."""
         request = MagicMock()
         del request.state.user_id  # No user_id
         request.headers = {"X-Forwarded-For": "1.2.3.4, 5.6.7.8"}
+        request.client = MagicMock()
+        request.client.host = "10.0.0.1"
         result = get_user_identifier(request)
-        assert result == "ip:5.6.7.8"
+        assert result == "ip:10.0.0.1"
 
     def test_no_forwarded_for(self):
         request = MagicMock()

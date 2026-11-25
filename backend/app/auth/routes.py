@@ -1,4 +1,8 @@
 import hmac
+import secrets
+import threading
+import time
+from collections import OrderedDict, deque
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Request, Response, status
@@ -16,6 +20,49 @@ from app.rate_limit import limiter
 
 # Advisory lock ID for serializing registration attempts (prevents race condition)
 _REGISTRATION_LOCK_ID = 20240422
+
+# Precomputed bcrypt hash of an unguessable random string. Verifying
+# against it when the username doesn't exist equalizes response timing so
+# attackers can't enumerate usernames by measuring login latency.
+_DUMMY_BCRYPT_HASH = hash_password(secrets.token_urlsafe(32))
+
+# Per-username login attempt tracking — the anti-brute-force control that
+# works in this deployment topology. All host traffic arrives at the backend
+# as the Docker gateway IP, so per-IP discrimination is impossible, and
+# X-Forwarded-For is client-controlled and untrusted (see rate_limit.py).
+# Keying on the attempted username rate-limits guesses against the real
+# account regardless of where the guesses come from.
+_LOGIN_WINDOW_SECONDS = 15 * 60
+_LOGIN_MAX_ATTEMPTS = 10
+_LOGIN_TRACKER_CAP = 10_000  # LRU cap — username spraying can't grow memory
+_LOGIN_ATTEMPTS: OrderedDict[str, deque[float]] = OrderedDict()
+_LOGIN_ATTEMPTS_LOCK = threading.Lock()
+
+
+def _check_and_record_login_attempt(username: str) -> bool:
+    """Record a login attempt for username; return True if it's allowed."""
+    now = time.monotonic()
+    with _LOGIN_ATTEMPTS_LOCK:
+        attempts = _LOGIN_ATTEMPTS.get(username)
+        if attempts is None:
+            attempts = deque()
+            _LOGIN_ATTEMPTS[username] = attempts
+        else:
+            _LOGIN_ATTEMPTS.move_to_end(username)  # LRU refresh
+        while attempts and now - attempts[0] > _LOGIN_WINDOW_SECONDS:
+            attempts.popleft()
+        allowed = len(attempts) < _LOGIN_MAX_ATTEMPTS
+        attempts.append(now)
+        while len(_LOGIN_ATTEMPTS) > _LOGIN_TRACKER_CAP:
+            _LOGIN_ATTEMPTS.popitem(last=False)
+        return allowed
+
+
+def _clear_login_attempts(username: str) -> None:
+    """Reset the attempt counter after a successful login."""
+    with _LOGIN_ATTEMPTS_LOCK:
+        _LOGIN_ATTEMPTS.pop(username, None)
+
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -111,37 +158,49 @@ async def register(request: Request, response: Response, user_data: UserRegister
     # Set httpOnly cookie for browser-based auth
     _set_auth_cookie(response, access_token)
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "username": user.username,
-    }
+    # F9: the JWT is delivered ONLY via the httpOnly cookie — the token is
+    # never in the response body (frontend uses pure cookie auth).
+    return {"username": user.username}
 
 
 @router.post("/login")
 @limiter.limit("5/minute", auth=True)
 async def login(request: Request, response: Response, user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     """Login and get an access token."""
+    if not _check_and_record_login_attempt(user_data.username):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts for this username. Try again later.",
+            headers={"Retry-After": "60"},
+        )
+
     result = await db.execute(select(User).where(User.username == user_data.username))
     user = result.scalar_one_or_none()
 
-    if not user or not verify_password(user_data.password, user.password_hash):
+    if user is None:
+        # Equalize timing — unknown usernames pay the bcrypt cost too
+        verify_password(user_data.password, _DUMMY_BCRYPT_HASH)
+        login_failed = True
+    else:
+        login_failed = not verify_password(user_data.password, user.password_hash)
+
+    if login_failed:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    _clear_login_attempts(user_data.username)
+
     access_token = create_access_token(data={"sub": str(user.id), "role": user.role, "ver": user.token_version})
 
     # Set httpOnly cookie for browser-based auth
     _set_auth_cookie(response, access_token)
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "username": user.username,
-    }
+    # F9: the JWT is delivered ONLY via the httpOnly cookie — the token is
+    # never in the response body (frontend uses pure cookie auth).
+    return {"username": user.username}
 
 
 @router.post("/change-password")

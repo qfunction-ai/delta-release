@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.agents.letta_proxy import router as letta_proxy_router
 from app.agents.routes import router as agents_router
@@ -158,6 +159,77 @@ async def lifespan(app: FastAPI):
     )
     logger.info("External log rotation scheduled (every 10m)")
 
+    # v0.16.39 adoption (D-5): warn loudly when the Letta sandbox is not
+    # actually enforcing Landlock. If the kernel doesn't support it, the
+    # fork falls back to the LOCAL executor — tools run as the server user
+    # with no filesystem restriction and CAN read /data/letta-secrets (PG
+    # password, encryption key). /v1/health/ is password-exempt in the
+    # fork, so no credentials are needed for this probe.
+    # C-2 companion (release check): if the server IS password-protected but
+    # the backend has no password (volume mount failure, missing file), log
+    # an ERROR naming the 401 consequence — otherwise the failure shows up
+    # as a page of 401s with nothing pointing at the cause. Probed via an
+    # unauthenticated request to a non-health endpoint: the fork's
+    # CheckPasswordMiddleware returns 401 on a protected server and the
+    # request passes through on an unprotected one.
+    try:
+        import httpx
+
+        from app.letta_client import letta_base_url
+
+        password = get_settings().letta_server_password
+        auth_headers = {"Authorization": f"Bearer {password}"} if password else {}
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{letta_base_url()}/v1/health/")
+            resp.raise_for_status()
+            health = resp.json()
+            # Auth probe: a protected server answers 401 without a password;
+            # an unprotected one answers anything else (200/404/422 —
+            # status only matters as "not 401").
+            probe = await client.get(f"{letta_base_url()}/v1/models")
+            server_protected = probe.status_code == 401
+            # Wrong-password probe (release check 2, nit 1): if a password IS
+            # configured, verify it against the server — a stale password
+            # file (e.g. after the letta volume was reset) would otherwise
+            # show up only as a page of 401s.
+            authenticated_probe_ok = True
+            if server_protected and password:
+                auth_probe = await client.get(f"{letta_base_url()}/v1/models", headers=auth_headers)
+                authenticated_probe_ok = auth_probe.status_code != 401
+        if server_protected and not password:
+            logger.error(
+                "SECURITY: the Letta server requires a password (unauthenticated request "
+                "returned 401) but none is configured for the backend — every API call "
+                "will fail with 401. Check the letta_server_password volume mount and the "
+                "letta container's password generation."
+            )
+        elif server_protected and not authenticated_probe_ok:
+            logger.error(
+                "SECURITY: the configured Letta server password is rejected by the "
+                "server (authenticated request returned 401) — every API call will "
+                "fail with 401. The password is stale: the letta_secrets volume may "
+                "have been reset. Regenerate it (docker compose up -d --force-recreate letta "
+                "regenerates on a fresh volume) or set LETTA_SERVER_PASSWORD."
+            )
+        landlock_abi = health.get("landlock_abi")
+        net_enforced = health.get("landlock_net_rules_enforced")
+        if not landlock_abi:
+            logger.warning(
+                "SECURITY: Letta Landlock is NOT active (health reports landlock_abi=%s). "
+                "Sandboxed tools run without filesystem restriction and can read the "
+                "letta_secrets volume. Check the Docker Desktop kernel / host support.",
+                landlock_abi,
+            )
+        elif net_enforced is False:
+            logger.warning(
+                "SECURITY: Letta Landlock network rules are not enforced "
+                "(landlock_abi=%s, net_rules_enforced=false). Tool network access is "
+                "governed by API auth (401) and PG authentication, not by the sandbox.",
+                landlock_abi,
+            )
+    except Exception as e:  # noqa: BLE001 — a failed probe must not block startup
+        logger.warning("Could not check Letta Landlock status: %s", type(e).__name__)
+
     # Startup banner
     banner = (
         "\n  Delta is running at http://localhost:3000\n"
@@ -229,6 +301,28 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Service-Token"],
 )
+
+
+# Trusted Host check — DNS-rebinding defense. A rebinding page can rebind
+# its hostname to 127.0.0.1 and reach the directly-published backend, but it
+# must send the attacker's hostname in the Host header, which this rejects.
+# Allowed hosts: the trusted_hosts setting (localhost, 127.0.0.1, and the
+# Compose service name "backend" — propose_tool/fetch_docs call the backend
+# by that name from inside the Letta container) plus hostnames derived from
+# the CORS origins. Added last so it runs first on the request path.
+def _get_trusted_hosts() -> list[str]:
+    from urllib.parse import urlparse
+
+    settings = get_settings()
+    hosts = {h.strip() for h in settings.trusted_hosts.split(",") if h.strip()}
+    for origin in get_cors_origins():
+        hostname = urlparse(origin).hostname if "://" in origin else origin
+        if hostname:
+            hosts.add(hostname)
+    return sorted(hosts)
+
+
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=_get_trusted_hosts())
 
 # Audit logging middleware
 app.add_middleware(AuditMiddleware)

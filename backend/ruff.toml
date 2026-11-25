@@ -10,4 +10,8 @@ ignore = [
 ]
 
 [lint.isort]
-known-first-party = ["app"]
+# `shared` must be explicit: the backend image copies shared/ into /app, so
+# in-container ruff classifies it as first-party (src=".") while a host-side
+# run from backend/ classifies it as third-party — same version, different
+# I001 result. Pin the classification so both agree.
+known-first-party = ["app", "shared"]

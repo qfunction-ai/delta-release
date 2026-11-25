@@ -10,6 +10,7 @@ from app.agents.schemas import AgentCreate, AgentResponse, AgentUpdate, Embeddin
 from app.agents.tools import attach_file_tools
 from app.auth.dependencies import get_current_user
 from app.auth.models import User
+from app.config import get_settings
 from app.constants import DEFAULT_PERSONA, OLLAMA_DISCOVERY_URLS
 from app.database import get_db, get_owned_or_404, list_owned
 from app.letta_client import call_letta, get_letta_client
@@ -168,6 +169,13 @@ async def create_agent(
     from app.credentials.service import build_credential_secrets_dict
 
     secrets = await build_credential_secrets_dict(current_user.id, db)
+    # The tool-callback token is delivered to the agent via the secrets
+    # channel (the only channel that survives v0.16.38's tool-env allowlist).
+    # propose_tool/fetch_docs read it with os.getenv("DELTA_SERVICE_TOKEN").
+    secrets["DELTA_SERVICE_TOKEN"] = get_settings().service_token
+    # Same channel for the backend base URL (propose_tool/fetch_docs call
+    # back to the Delta API; sandboxed tools don't inherit container env).
+    secrets["DELTA_API_BASE_URL"] = get_settings().backend_url
 
     letta_agent = await call_letta(
         client.agents.create,

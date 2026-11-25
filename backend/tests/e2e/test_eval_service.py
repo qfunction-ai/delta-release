@@ -111,7 +111,9 @@ class TestEvalServiceEndpoints:
             },
         )
         if login_resp.status_code == 200:
-            user_token = login_resp.json()["access_token"]
+            from .conftest import _token_from_response
+
+            user_token = _token_from_response(login_resp)
             settings_resp = e2e_client.get("/api/settings/", headers={"Authorization": f"Bearer {user_token}"})
             if settings_resp.status_code == 200:
                 assert settings_resp.json()["agent_tool_creation"] is True

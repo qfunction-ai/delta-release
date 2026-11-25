@@ -38,13 +38,13 @@ describe('ToolProposalList', () => {
     expect(screen.getByText('AI-generated')).toBeInTheDocument()
   })
 
-  it('shows dry run status for each proposal', () => {
+  it('shows registration check status for each proposal', () => {
     render(<ToolProposalList {...defaultProps} />)
 
-    expect(screen.getByText('Dry run passed')).toBeInTheDocument()
+    expect(screen.getByText('Registration check passed')).toBeInTheDocument()
   })
 
-  it('shows dry run failed when proposal has dry_run_error', () => {
+  it('shows registration check failed when proposal has dry_run_error', () => {
     const failedProposal = {
       ...mockProposal,
       dry_run_error: 'ImportError: no module named foo',
@@ -52,7 +52,7 @@ describe('ToolProposalList', () => {
     }
     render(<ToolProposalList {...defaultProps} proposals={[failedProposal]} />)
 
-    expect(screen.getByText('Dry run failed')).toBeInTheDocument()
+    expect(screen.getByText('Registration check failed')).toBeInTheDocument()
   })
 
   it('calls onViewProposal when clicking a proposal card', async () => {

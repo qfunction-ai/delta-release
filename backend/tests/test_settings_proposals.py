@@ -149,10 +149,10 @@ class TestSettingsRoutes:
         client, headers, _ = registered_client
 
         # Override the service token dependency via the test app
-        from app.auth.dependencies import verify_service_token
+        from app.auth.dependencies import verify_eval_service_token
 
         test_app = app_client._transport.app  # Access the FastAPI app from the ASGI transport
-        test_app.dependency_overrides[verify_service_token] = lambda: None
+        test_app.dependency_overrides[verify_eval_service_token] = lambda: None
 
         try:
             # Missing agent_id
@@ -167,7 +167,7 @@ class TestSettingsRoutes:
             )
             assert resp.status_code == 400
         finally:
-            test_app.dependency_overrides.pop(verify_service_token, None)
+            test_app.dependency_overrides.pop(verify_eval_service_token, None)
 
     @pytest.mark.asyncio
     async def test_eval_update_settings_allows_all_toggles(self, registered_client, mock_letta_client, app_client):
@@ -190,10 +190,10 @@ class TestSettingsRoutes:
         agent_id = agent_resp.json()["letta_agent_id"]
 
         # Override the service token dependency via the test app
-        from app.auth.dependencies import verify_service_token
+        from app.auth.dependencies import verify_eval_service_token
 
         test_app = client._transport.app
-        test_app.dependency_overrides[verify_service_token] = lambda: None
+        test_app.dependency_overrides[verify_eval_service_token] = lambda: None
 
         try:
             # Set toggles via eval endpoint
@@ -208,7 +208,7 @@ class TestSettingsRoutes:
                 },
             )
         finally:
-            test_app.dependency_overrides.pop(verify_service_token, None)
+            test_app.dependency_overrides.pop(verify_eval_service_token, None)
 
         assert resp.status_code == 200
         data = resp.json()

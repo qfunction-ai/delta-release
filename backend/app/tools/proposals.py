@@ -1,4 +1,10 @@
-"""Tool proposal helpers — dry-run execution."""
+"""Tool proposal helpers — registration checks (F7 rename).
+
+Historically called "dry run" — but nothing executes: the check only
+verifies the source compiles, the entry point exists, and the tool can be
+registered and removed in Letta. The display name was renamed to avoid
+reading "Dry run: PASSED" as "it ran safely".
+"""
 
 import logging
 import re
@@ -56,9 +62,9 @@ async def execute_dry_run(
             client.tools.create,
             source_code=source_code,
             source_type="python",
-            description=f"Dry run for {entry_point_name}",
+            description=f"Registration check for {entry_point_name}",
             args_json_schema=args_schema,
-            tags=["dry-run"],
+            tags=["registration-check"],
         )
 
         await call_letta(client.tools.delete, temp_tool.id, raise_on_error=False)
@@ -68,7 +74,10 @@ async def execute_dry_run(
         # 1. The code compiles (sanitizer already checked this)
         # 2. The entry point exists (tool_yaml.py checked this)
         # 3. The tool can be created in Letta (creation succeeded)
-        return "Tool code compiles successfully. Entry point found. Dry run passed structural validation.", None
+        return (
+            "Registration check passed: tool code compiles, entry point exists, and it was successfully registered and removed. Nothing was executed.",
+            None,
+        )
 
     except LETTA_ERRORS as e:
         error_msg = str(e)
@@ -76,4 +85,4 @@ async def execute_dry_run(
             return None, f"Syntax error in tool code: {error_msg}"
         if "import" in error_msg.lower():
             return None, f"Import error: {error_msg}"
-        return None, f"Dry run failed: {error_msg}"
+        return None, f"Registration check failed: {error_msg}"

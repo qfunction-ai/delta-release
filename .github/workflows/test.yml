@@ -76,6 +76,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Repo-level tests read docker-compose.yml / postgres/Dockerfile /
+      # pip-sidecar via the repo root (Path(__file__).parents[2]). Inside
+      # the backend container that resolves to / and the files don't exist,
+      # so these run on the runner instead. Pins match the shipped stack
+      # (backend/requirements*.txt, pip-sidecar/requirements.txt) — without
+      # pytest-asyncio the async sidecar tests are silently skipped.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Run repo-level tests (compose/sidecar)
+        run: |
+          python -m pip install --quiet pytest==8.3.5 pytest-asyncio==0.24.0 fastapi==0.115.12 httpx==0.27.2 pyyaml==6.0.2
+          PYTHONPATH=$GITHUB_WORKSPACE python -m pytest \
+            backend/tests/test_compose_security.py \
+            backend/tests/test_compose_password_topology.py \
+            backend/tests/test_release_compose.py \
+            backend/tests/test_sidecar_shadow_guard.py \
+            --noconftest -q \
+            -W error::pytest.PytestUnhandledCoroutineWarning \
+            -p no:cacheprovider -rs
+
       - name: Create .env for compose
         run: |
           echo "JWT_SECRET=ci-test-jwt-secret" > .env
@@ -124,7 +147,7 @@ jobs:
           fi
 
       - name: Run tests with coverage
-        run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage run -m pytest tests/ -v --ignore=tests/e2e --tb=short
+        run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage run -m pytest tests/ -v --ignore=tests/e2e --ignore=tests/test_compose_security.py --ignore=tests/test_compose_password_topology.py --ignore=tests/test_release_compose.py --ignore=tests/test_sidecar_shadow_guard.py --tb=short
 
       - name: Coverage report
         run: docker compose exec -T -e COVERAGE_FILE=/tmp/.coverage backend python3 -m coverage report --include='app/*' --fail-under=55

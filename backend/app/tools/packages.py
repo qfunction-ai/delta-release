@@ -18,8 +18,8 @@ async def sidecar_request(method: str, path: str, **kwargs) -> httpx.Response:
     """Make an authenticated HTTP request to the pip sidecar."""
     settings = get_settings()
     headers = kwargs.pop("headers", {})
-    if settings.service_token:
-        headers["X-Service-Token"] = settings.service_token
+    if settings.sidecar_service_token:
+        headers["X-Service-Token"] = settings.sidecar_service_token
     try:
         async with httpx.AsyncClient(timeout=PIPSIDECAR_INSTALL_TIMEOUT) as client:
             response = await client.request(method, f"{PIPSIDECAR_URL}{path}", headers=headers, **kwargs)

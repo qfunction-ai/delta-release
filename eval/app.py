@@ -15,12 +15,13 @@ import re
 import time
 from collections import defaultdict
 from logging.handlers import RotatingFileHandler
-from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel, field_validator
-from shared.service_token import _get_service_token, verify_service_token
+from shared.service_token import _get_service_token, make_verify_service_token
 from shared.code_safety import DANGEROUS_MODULES, SAFE_BUILTINS
+
+verify_eval_service_token = make_verify_service_token("eval")
 
 # Configure file logging
 LOG_DIR = "/data/logs"
@@ -680,7 +681,7 @@ def _make_backend_call_agent(request: EvalRequest):
     """Return a call_agent that routes through the Delta backend's eval chat endpoint."""
     backend_url = request.backend_url.rstrip("/")
     auth_headers = {"Content-Type": "application/json"}
-    token = _get_service_token()
+    token = _get_service_token("eval")
     if token:
         auth_headers["X-Service-Token"] = token
 
@@ -794,7 +795,7 @@ async def _apply_settings(
     Used to configure toggle state before running eval scenarios.
     """
     auth_headers = {"Content-Type": "application/json"}
-    token = _get_service_token()
+    token = _get_service_token("eval")
     if token:
         auth_headers["X-Service-Token"] = token
 
@@ -810,7 +811,7 @@ async def _apply_settings(
 
 
 @app.post("/run", response_model=EvalRunResponse)
-async def run_eval(request: EvalRequest, _auth=Depends(verify_service_token)):
+async def run_eval(request: EvalRequest, _auth=Depends(verify_eval_service_token)):
     """Execute a giskard scenario against a Letta agent.
 
     1. Connect to Letta (or use mock if MOCK_AGENT=1)

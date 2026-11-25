@@ -156,3 +156,59 @@ class TestValidateDownloadUrl:
     def test_ftp_scheme_blocked(self):
         is_valid, error, ip = validate_download_url("ftp://github.com/file")
         assert is_valid is False
+
+
+class TestIPv4EmbeddedIPv6:
+    """F8: IPv4-mapped/NAT64/6to4 forms must hit the IPv4 blocklist."""
+
+    def test_ipv4_mapped_link_local_blocked(self):
+        assert _is_private_ip("::ffff:169.254.169.254") is True
+
+    def test_ipv4_mapped_loopback_blocked(self):
+        assert _is_private_ip("::ffff:127.0.0.1") is True
+
+    def test_ipv4_mapped_private_blocked(self):
+        assert _is_private_ip("::ffff:10.0.0.1") is True
+
+    def test_nat64_wrapped_link_local_blocked(self):
+        # 64:ff9b::a9fe:a9fe = NAT64 embedding of 169.254.169.254
+        assert _is_private_ip("64:ff9b::a9fe:a9fe") is True
+
+    def test_sixtofour_wrapped_private_blocked(self):
+        # 2002:a00:1:: = 6to4 embedding of 10.0.0.1
+        assert _is_private_ip("2002:a00:1::") is True
+
+    def test_ipv4_mapped_public_allowed(self):
+        assert _is_private_ip("::ffff:8.8.8.8") is False
+
+    def test_plain_ipv6_loopback_still_blocked(self):
+        assert _is_private_ip("::1") is True
+
+    def test_plain_ipv6_link_local_still_blocked(self):
+        assert _is_private_ip("fe80::1") is True
+
+    def test_plain_public_allowed(self):
+        assert _is_private_ip("8.8.8.8") is False
+
+    def test_hostname_resolving_only_mapped_form_blocked(self):
+        """End-to-end: a hostname that resolves only to the mapped form is
+        blocked by validate_api_url (mock getaddrinfo)."""
+        import socket
+
+        fake_addrinfo = [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("::ffff:169.254.169.254", 0, 0, 0)),
+        ]
+        with patch("app.ssrf.socket.getaddrinfo", return_value=fake_addrinfo):
+            is_valid, error, ip = validate_api_url("http://metadata-attack.example/api")
+        assert is_valid is False
+        assert "private/reserved" in error
+
+    def test_nat64_hostname_blocked(self):
+        import socket
+
+        fake_addrinfo = [
+            (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("64:ff9b::a9fe:a9fe", 0, 0, 0)),
+        ]
+        with patch("app.ssrf.socket.getaddrinfo", return_value=fake_addrinfo):
+            is_valid, error, _ = validate_api_url("http://nat64-attack.example/api")
+        assert is_valid is False

@@ -27,7 +27,7 @@ class TestSidecarRequest:
             patch("app.tools.packages.get_settings") as mock_settings,
             patch("app.tools.packages.httpx.AsyncClient", return_value=mock_client),
         ):
-            mock_settings.return_value.service_token = "test-token"
+            mock_settings.return_value.sidecar_service_token = "test-token"
             await sidecar_request("GET", "/packages")
 
         # Verify service token was added to headers
@@ -46,7 +46,7 @@ class TestSidecarRequest:
             patch("app.tools.packages.get_settings") as mock_settings,
             patch("app.tools.packages.httpx.AsyncClient", return_value=mock_client),
         ):
-            mock_settings.return_value.service_token = "test-token"
+            mock_settings.return_value.sidecar_service_token = "test-token"
             with pytest.raises(HTTPException) as exc_info:
                 await sidecar_request("GET", "/packages")
             assert exc_info.value.status_code == 503
@@ -63,7 +63,7 @@ class TestSidecarRequest:
             patch("app.tools.packages.get_settings") as mock_settings,
             patch("app.tools.packages.httpx.AsyncClient", return_value=mock_client),
         ):
-            mock_settings.return_value.service_token = "test-token"
+            mock_settings.return_value.sidecar_service_token = "test-token"
             with pytest.raises(HTTPException) as exc_info:
                 await sidecar_request("GET", "/packages")
             assert exc_info.value.status_code == 504
@@ -83,7 +83,7 @@ class TestSidecarRequest:
             patch("app.tools.packages.get_settings") as mock_settings,
             patch("app.tools.packages.httpx.AsyncClient", return_value=mock_client),
         ):
-            mock_settings.return_value.service_token = ""
+            mock_settings.return_value.sidecar_service_token = ""
             await sidecar_request("GET", "/packages")
 
         # No X-Service-Token header when token is empty
