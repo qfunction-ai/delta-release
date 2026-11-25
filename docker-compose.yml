@@ -172,13 +172,14 @@ services:
       - POSTGRES_DB=delta
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
       # letta_secrets: written by the 03/04 initdb scripts on fresh volume
       # init (letta role password + secrets encryption key). The letta
       # container mounts the same volume at /data/letta-secrets. The
-      # volume root is chowned 999:1000 (setgid) by init-volumes so the
-      # postgres user (999) can write and the letta wrapper (1000) can
-      # read via the group.
+      # initdb scripts are baked into the postgres image (postgres/
+      # Dockerfile: COPY initdb/ + dos2unix for Windows CRLF), NOT bind-
+      # mounted. init-volumes pre-creates the secret files 999:1000 640
+      # so the postgres user (999) can write and the letta wrapper (1000)
+      # can read via the group.
       - letta_secrets:/letta-secrets
       - logs:/data/logs
     command: >
@@ -337,7 +338,7 @@ services:
          export LETTA_PG_URI=\"postgresql://letta:$$PGPW@postgres:5432/letta\";
          echo '[F4] Connecting as scoped role letta';
        else
-         echo '[F4] FATAL: no scoped database password. This looks like an install from before 2026-11; Delta is fresh-install only. Run: docker compose down -v && docker compose up -d'; exit 1;
+         echo '[F4] FATAL: no scoped database password. This looks like an install from before 2026-11; Delta is fresh-install only. Run: docker compose down -v --rmi local && docker compose up -d --build'; exit 1;
        fi;
        if [ ! -s /data/letta-secrets/letta_encryption_key ]; then
          if [ -e /data/letta-secrets/letta_encryption_key.sentinel ]; then

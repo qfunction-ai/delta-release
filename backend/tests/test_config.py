@@ -182,9 +182,7 @@ class TestPostgresPasswordWarning:
 
     def test_strong_password_no_warning(self, caplog):
         with caplog.at_level(logging.WARNING):
-            self._settings(
-                "postgresql://delta:superlongrandompassword1@postgres:5432/delta"
-            ).check_security()
+            self._settings("postgresql://delta:superlongrandompassword1@postgres:5432/delta").check_security()
         assert not any("database password" in w for w in caplog.messages)
 
     def test_dev_mode_no_warning(self, caplog):

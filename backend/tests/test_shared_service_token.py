@@ -7,6 +7,7 @@ runner puts on the path via the shared package install.
 from unittest.mock import mock_open, patch
 
 import pytest
+
 import shared.service_token as st
 
 

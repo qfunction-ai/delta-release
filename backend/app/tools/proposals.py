@@ -74,7 +74,10 @@ async def execute_dry_run(
         # 1. The code compiles (sanitizer already checked this)
         # 2. The entry point exists (tool_yaml.py checked this)
         # 3. The tool can be created in Letta (creation succeeded)
-        return "Registration check passed: tool code compiles, entry point exists, and it was successfully registered and removed. Nothing was executed.", None
+        return (
+            "Registration check passed: tool code compiles, entry point exists, and it was successfully registered and removed. Nothing was executed.",
+            None,
+        )
 
     except LETTA_ERRORS as e:
         error_msg = str(e)

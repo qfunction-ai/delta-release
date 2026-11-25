@@ -13,8 +13,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
-import shared.service_token as st
 from httpx import ASGITransport, AsyncClient
+
+import shared.service_token as st
 
 _SIDECAR_APP = Path(__file__).resolve().parents[2] / "pip-sidecar" / "app.py"
 

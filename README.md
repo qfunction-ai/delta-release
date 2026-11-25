@@ -46,7 +46,7 @@ Self-hosted cybersecurity workflow automation powered by Letta agents.
 
 ## Quick Start
 
-> **Delta is demo software for the "AI for SOC Analysts" course.** Each release is a fresh install. If you installed an earlier version, remove it completely (`docker compose down -v`) and install the new one. No data is carried over. Back up anything you want to keep first.
+> **Delta is demo software for the "AI for SOC Analysts" course.** Each release is a fresh install. If you installed an earlier version, remove it completely (`docker compose down -v --rmi local && docker compose up -d --build`) and install the new one. No data is carried over. Back up anything you want to keep first.
 
 ### Prerequisites
 
@@ -74,8 +74,12 @@ Open http://localhost:3000. The first account is automatically assigned the **ad
 | `docker compose stop` | Stop containers, keep all data |
 | `docker compose down` | Stop and remove containers, **keep all data** (volumes preserved) |
 | `docker compose down -v` | Stop and remove containers, **DELETE ALL DATA** (volumes removed) |
-| `docker compose pull` | Update container images |
-| `docker compose up -d` | Start (or restart after pull) |
+| `docker compose down -v --rmi local && docker compose up -d --build` | Start completely fresh: delete all data, remove locally built images, rebuild from source |
+| `docker compose up -d` | Start (or restart) |
+
+Note: backend, frontend, postgres, and pip-sidecar are **built from source**,
+not pulled — `docker compose pull` does not update them. To move to a new
+release: `git pull`, then run the fresh-install command above.
 
 Your agents, conversations, credentials, and settings are stored in Docker volumes. `docker compose down` preserves them. `docker compose down -v` destroys them permanently.
 
@@ -261,6 +265,7 @@ All variables use the `DELTA_` prefix. Docker Compose maps them from `.env`.
 | `DELTA_MAX_STEPS` | 50 | Max tool-calling steps per execution |
 | `DELTA_VERIFY_TLS` | true | TLS verification for outbound requests |
 | `DELTA_RATE_LIMIT_DEFAULT` | `100/minute` | Default rate limit; set `1000/minute` for dev/CI |
+| `LETTA_RES_OPTIONS` | (unset) | Linux hosts only: set `use-vc` if sandboxed agent tools (propose_tool, fetch_docs) fail to reach `backend` with a name-resolution error. Leave unset on Docker Desktop (Windows/macOS) |
 
 **Eval** (opt-in — start with `docker compose -f docker-compose.yml -f docker-compose.eval.yml up -d`):
 
@@ -284,7 +289,7 @@ docker compose exec backend alembic revision --autogenerate -m "description"
 To wipe all data and start fresh:
 
 ```bash
-docker compose down -v && docker compose up -d
+docker compose down -v --rmi local && docker compose up -d --build
 ```
 
 This removes all volumes (databases, agent data, credentials) and recreates everything. See [Managing Your Data](#managing-your-data) for the difference between `down` and `down -v`.

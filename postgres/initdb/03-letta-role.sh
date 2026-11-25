@@ -9,9 +9,10 @@
 # reads it and overrides LETTA_PG_URI, so the letta server connects as
 # the scoped role instead of the superuser.
 #
-# chmod 640: the volume root is chowned 999:1000 with setgid (2770) by
-# the init-volumes service, so files written by postgres (UID 999)
-# inherit group 1000 — the letta wrapper (UID 1000) reads via the group.
+# chmod 640: init-volumes pre-creates these files 999:1000 640 (setgid on
+# the volume root does not survive Docker Desktop's mount layer), and
+# redirection into a pre-owned file preserves ownership — so postgres
+# (UID 999) writes and the letta wrapper (UID 1000) reads via the group.
 # The volume is mounted nowhere else and is not on any Landlock read path.
 set -e
 
