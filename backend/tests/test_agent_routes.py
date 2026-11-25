@@ -69,6 +69,12 @@ class TestAgentCreate:
         data = resp.json()
         assert data["name"] == "test-agent"
         assert "letta_agent_id" in data
+        # G-1: the backend base URL rides the agent-secrets channel (sandboxed
+        # tools don't inherit container env since v0.16.38) — same as the token.
+        create_kwargs = mock_letta_client.agents.create.call_args.kwargs
+        secrets = create_kwargs.get("secrets") or {}
+        assert "DELTA_SERVICE_TOKEN" in secrets
+        assert secrets.get("DELTA_API_BASE_URL") == "http://backend:8000"
 
 
 @pytest.mark.asyncio

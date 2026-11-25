@@ -12,6 +12,9 @@ SKILL_FILENAME = "SKILL.md"
 
 # Shared volume path for persisting auto-generated secrets across restarts
 _SECRETS_DIR = "/data/config"
+# Backend-owned secrets (eval/sidecar tokens) — delta_secrets volume, never
+# mounted in the Letta container. Backend mounts rw, eval/sidecar mount ro.
+_DELTA_SECRETS_DIR = "/data/secrets"
 
 _INSECURE_DEFAULTS = {
     "jwt_secret": "change-me-in-production",
@@ -52,6 +55,11 @@ class Settings(BaseSettings):
     # Letta
     letta_base_url: str = "http://localhost:8283"
 
+    # Letta server password (v0.16.39+ API auth). Empty = no auth (fake-letta
+    # CI, pre-0.16.39 pins). Read from the letta_secrets volume file when the
+    # env var is unset — see _load_letta_server_password below.
+    letta_server_password: str = ""
+
     # Backend URL as seen from the Letta container (for tool exec env vars)
     backend_url: str = "http://backend:8000"
 
@@ -63,7 +71,20 @@ class Settings(BaseSettings):
     dev_mode: bool = False
 
     # Service token for internal service-to-service auth (e.g., credential execution)
+    # Scoped to the tool-callback endpoints only (propose/fetch); delivered to
+    # agents via the agent secrets channel. See docs/security-fixes-phase1-plan.md F2.
     service_token: str = ""
+
+    # Eval service token — authenticates the eval container against the
+    # backend (settings/chat eval endpoints) and the backend against the eval
+    # runner. Distinct from the tool-callback token so a leaked eval token
+    # can't propose tools or fetch docs, and vice versa.
+    eval_service_token: str = ""
+
+    # Sidecar service token — authenticates the backend against pip-sidecar
+    # package install/list/uninstall calls. Held only by the backend and the
+    # pip-sidecar (delta_secrets volume, never mounted in the Letta container).
+    sidecar_service_token: str = ""
 
     # Setup token for first-user registration (optional)
     # If set, the first user must provide this token when registering.
@@ -74,6 +95,19 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed origins for the frontend.
     # Never use "*" in production with credentials=True — it's a CSRF vector.
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+
+    # Rate limiting — default request limit for all endpoints.
+    # Dev mode / E2E typically sets this high (e.g. "1000/minute") via
+    # DELTA_RATE_LIMIT_DEFAULT to effectively disable limiting.
+    rate_limit_default: str = "100/minute"
+
+    # Trusted Host headers — DNS-rebinding defense. A rebinding page carries
+    # the attacker's hostname in the Host header, so it is rejected outright.
+    # Must include the Compose service name "backend": propose_tool and
+    # fetch_docs call the backend by that name from inside the Letta
+    # container, and those requests arrive with Host: backend[:port].
+    # Hostnames from cors_origins are also trusted (added at startup).
+    trusted_hosts: str = "localhost,127.0.0.1,backend"
 
     # Operational limits (configurable via env vars)
     max_steps: int = 50
@@ -121,11 +155,23 @@ class Settings(BaseSettings):
             )
 
         # Warn about auto-generated service token — not available to
-        # the Letta container if not set via env var
+        # the agents unless delivered via the agent secrets channel
         if not self.dev_mode and not self.service_token:
             warnings.append(
-                "service_token (auto-generated — set DELTA_SERVICE_TOKEN in .env for production deployments)"
+                "service_token (auto-generated tool-callback token — set DELTA_SERVICE_TOKEN in .env for production deployments)"
             )
+
+        # F6: warn on default/weak Postgres password — the backend's own
+        # credential (delta DB).
+        try:
+            from urllib.parse import unquote, urlparse
+
+            _pg = urlparse(self.database_url)
+            _pg_password = unquote(_pg.password or "")
+            if not self.dev_mode and (_pg_password == "delta" or len(_pg_password) < 16):
+                warnings.append("database password (default or short (<16 chars) — set POSTGRES_PASSWORD in .env)")
+        except ValueError:
+            pass  # malformed URL — not this check's job to reject
 
         # Block wildcard CORS with credentials — it's a CSRF vector
         if "*" in self.cors_origins.split(",") and not self.dev_mode:
@@ -183,10 +229,10 @@ class Settings(BaseSettings):
                 )
 
 
-def _read_secret_from_volume(name: str) -> str | None:
+def _read_secret_from_volume(name: str, secrets_dir: str = _SECRETS_DIR) -> str | None:
     """Read a previously auto-generated secret from the shared volume."""
     try:
-        path = os.path.join(_SECRETS_DIR, name)
+        path = os.path.join(secrets_dir, name)
         with open(path, "r") as f:
             value = f.read().strip()
         if value:
@@ -197,15 +243,15 @@ def _read_secret_from_volume(name: str) -> str | None:
     return None
 
 
-def _write_secret_to_volume(name: str, value: str) -> None:
+def _write_secret_to_volume(name: str, value: str, secrets_dir: str = _SECRETS_DIR) -> None:
     """Write an auto-generated secret to the shared volume.
 
     File permissions are set to 0600 (owner read/write only) to prevent
     other processes from reading the secret.
     """
     try:
-        os.makedirs(_SECRETS_DIR, exist_ok=True)
-        path = os.path.join(_SECRETS_DIR, name)
+        os.makedirs(secrets_dir, exist_ok=True)
+        path = os.path.join(secrets_dir, name)
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(value)
@@ -298,6 +344,56 @@ def _auto_generate_secrets(settings: Settings) -> None:
         # for pip-sidecar and eval containers that read from file
         _write_secret_to_volume("service_token", settings.service_token)
 
+    # Eval service token (backend <-> eval runner)
+    if _needs_auto_generation(settings.eval_service_token):
+        existing = _read_secret_from_volume("eval_service_token", _DELTA_SECRETS_DIR)
+        if existing:
+            settings.eval_service_token = existing
+        else:
+            settings.eval_service_token = secrets.token_urlsafe(32)
+            logger.info("🔑 Auto-generated eval service token (DELTA_EVAL_SERVICE_TOKEN not set).")
+            _write_secret_to_volume("eval_service_token", settings.eval_service_token, _DELTA_SECRETS_DIR)
+    else:
+        _write_secret_to_volume("eval_service_token", settings.eval_service_token, _DELTA_SECRETS_DIR)
+
+    # Sidecar service token (backend -> pip-sidecar)
+    if _needs_auto_generation(settings.sidecar_service_token):
+        existing = _read_secret_from_volume("sidecar_service_token", _DELTA_SECRETS_DIR)
+        if existing:
+            settings.sidecar_service_token = existing
+        else:
+            settings.sidecar_service_token = secrets.token_urlsafe(32)
+            logger.info("🔑 Auto-generated sidecar service token (DELTA_SIDECAR_SERVICE_TOKEN not set).")
+            _write_secret_to_volume("sidecar_service_token", settings.sidecar_service_token, _DELTA_SECRETS_DIR)
+    else:
+        _write_secret_to_volume("sidecar_service_token", settings.sidecar_service_token, _DELTA_SECRETS_DIR)
+
+
+_LETTA_SERVER_PASSWORD_FILE = "/data/letta-secrets/server_password/password"
+
+
+def _load_letta_server_password(settings: Settings) -> None:
+    """Resolve the Letta server password (v0.16.39 adoption item 1).
+
+    Precedence: explicit env var (LETTA_SERVER_PASSWORD in .env/compose)
+    wins; otherwise fall back to the file the letta command wrapper
+    generates on the letta_secrets volume, in its own subdirectory
+    (least privilege: the backend mounts ONLY that path, so its read of
+    the password does not also expose the PG password or the encryption
+    key). Empty when neither exists — fake-letta CI and pre-0.16.39 pins
+    run unauthenticated, and every consumer sends the header only when
+    non-empty (graceful degradation, same pattern as the abort API).
+    """
+    if settings.letta_server_password:
+        return
+    try:
+        with open(_LETTA_SERVER_PASSWORD_FILE) as f:
+            value = f.read().strip()
+        if value:
+            settings.letta_server_password = value
+    except OSError:
+        pass  # No password file — unauthenticated (CI / pre-0.16.39)
+
 
 @lru_cache
 def get_settings() -> Settings:
@@ -306,6 +402,9 @@ def get_settings() -> Settings:
     # Auto-generate missing secrets BEFORE security check.
     # This ensures first-run works without .env configuration.
     _auto_generate_secrets(settings)
+
+    # Letta server password: env override, else the wrapper-generated file
+    _load_letta_server_password(settings)
 
     settings.check_security()
 

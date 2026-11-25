@@ -105,3 +105,96 @@ class TestGetCorsOrigins:
         # The default setting has no extra whitespace, but the function
         # should handle it
         assert isinstance(get_cors_origins(), list)
+
+
+class TestAutoGenerateServiceTokens:
+    """F2: eval and sidecar tokens auto-generate to the delta_secrets dir."""
+
+    def test_eval_token_generated_when_empty(self):
+        from unittest.mock import patch
+
+        from app.config import Settings, _auto_generate_secrets
+
+        settings = Settings(jwt_secret="x" * 48, credentials_encryption_key="y" * 44)
+        with (
+            patch("app.config._read_secret_from_volume", return_value=None) as mock_read,
+            patch("app.config._write_secret_to_volume") as mock_write,
+        ):
+            _auto_generate_secrets(settings)
+
+        assert settings.eval_service_token, "eval token must be auto-generated"
+        assert settings.sidecar_service_token, "sidecar token must be auto-generated"
+        # The new tokens live on the delta_secrets dir, not /data/config
+        written = {call.args[0] for call in mock_write.call_args_list}
+        assert "eval_service_token" in written
+        assert "sidecar_service_token" in written
+        for call in mock_write.call_args_list:
+            if call.args[0] in ("eval_service_token", "sidecar_service_token"):
+                assert call.args[2] == "/data/secrets"
+        # And they are read back from the same dir on restart
+        read = {call.args[0] for call in mock_read.call_args_list}
+        assert {"eval_service_token", "sidecar_service_token"} <= read
+
+    def test_explicit_tokens_are_kept_and_persisted(self):
+        from unittest.mock import patch
+
+        from app.config import Settings, _auto_generate_secrets
+
+        settings = Settings(
+            jwt_secret="x" * 48,
+            credentials_encryption_key="y" * 44,
+            eval_service_token="my-eval-token-0123456789abcdef",
+            sidecar_service_token="my-sidecar-token-0123456789abcdef",
+        )
+        with (
+            patch("app.config._read_secret_from_volume", return_value=None),
+            patch("app.config._write_secret_to_volume") as mock_write,
+        ):
+            _auto_generate_secrets(settings)
+
+        assert settings.eval_service_token == "my-eval-token-0123456789abcdef"
+        assert settings.sidecar_service_token == "my-sidecar-token-0123456789abcdef"
+        # Explicit values are still persisted for the consumers that read files
+        written = {call.args[0] for call in mock_write.call_args_list}
+        assert {"eval_service_token", "sidecar_service_token"} <= written
+
+
+class TestPostgresPasswordWarning:
+    """F6: weak/default Postgres password produces a startup warning."""
+
+    def _settings(self, url):
+        return Settings(
+            database_url=url,
+            dev_mode=False,
+            jwt_secret="a" * 48,
+            credentials_encryption_key="b" * 44,
+        )
+
+    def test_default_delta_password_warns(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            self._settings("postgresql://delta:delta@postgres:5432/delta").check_security()
+        assert any("database password" in w for w in caplog.messages)
+
+    def test_short_password_warns(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            self._settings("postgresql://delta:short@postgres:5432/delta").check_security()
+        assert any("database password" in w for w in caplog.messages)
+
+    def test_strong_password_no_warning(self, caplog):
+        with caplog.at_level(logging.WARNING):
+            self._settings(
+                "postgresql://delta:superlongrandompassword1@postgres:5432/delta"
+            ).check_security()
+        assert not any("database password" in w for w in caplog.messages)
+
+    def test_dev_mode_no_warning(self, caplog):
+        s = Settings(database_url="postgresql://delta:delta@postgres:5432/delta", dev_mode=True)
+        with caplog.at_level(logging.WARNING):
+            s.check_security()
+        assert not any("database password" in w for w in caplog.messages)
+
+    def test_url_encoded_password_parsed(self, caplog):
+        """URL-encoded special chars in the password are decoded before the check."""
+        with caplog.at_level(logging.WARNING):
+            self._settings("postgresql://delta:sh%40rt@postgres:5432/delta").check_security()
+        assert any("database password" in w for w in caplog.messages)

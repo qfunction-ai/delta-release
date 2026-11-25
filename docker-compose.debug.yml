@@ -1,0 +1,16 @@
+# Debug override — republishes the Letta API port on the host.
+#
+# F5 removed the default publication of 8283: the backend talks to letta
+# over the docker network, and an unauthenticated localhost port does not
+# stop DNS-rebinding browser attacks. This override restores host access
+# for human debugging and the Letta version pin-bump regression protocol.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.debug.yml up -d
+#
+# The port binds to 127.0.0.1 only — never expose the Letta API beyond
+# the local machine.
+services:
+  letta:
+    ports:
+      - "127.0.0.1:8283:8283"

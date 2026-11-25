@@ -7,12 +7,13 @@ effectively disable rate limiting for E2E tests and local development.
 """
 
 import logging
-import os
 
 from fastapi import HTTPException, Request
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+
+from app.config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,27 +21,23 @@ logger = logging.getLogger(__name__)
 def get_user_identifier(request: Request) -> str:
     """Get identifier for rate limiting - user_id if authenticated, else IP.
 
-    For proxied requests, uses the rightmost X-Forwarded-For IP (the one
-    set by the most trusted proxy). For direct requests, uses the
-    connection IP.
+    X-Forwarded-For is deliberately NOT honored. No legitimate client of
+    this deployment sends it: the browser calls the backend directly and
+    nginx serves only static assets (no proxy_pass, no XFF directive), so
+    the header is purely attacker-controlled — trusting it let anyone
+    rotate rate-limit keys at will (code review D-6). Unauthenticated
+    requests key on the connection IP.
     """
     if hasattr(request.state, "user_id"):
         return f"user:{request.state.user_id}"
 
-    # Try X-Forwarded-For header (set by reverse proxy)
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        # Take the rightmost IP — this is the one set by the most
-        # trusted proxy in the chain. Leftmost IPs can be spoofed.
-        client_ip = forwarded.split(",")[-1].strip()
-        return f"ip:{client_ip}"
-
     return f"ip:{get_remote_address(request)}"
 
 
-# In dev mode, use a very high limit so E2E tests and local development
-# never hit rate limits. Production uses the standard 100/minute.
-_default_limit = os.getenv("DELTA_RATE_LIMIT_DEFAULT", "100/minute")
+# Default limit comes from Settings (env DELTA_RATE_LIMIT_DEFAULT). In dev
+# mode, use a very high limit so E2E tests and local development never hit
+# rate limits. Production uses the standard 100/minute.
+_default_limit = get_settings().rate_limit_default
 
 limiter = Limiter(
     key_func=get_user_identifier,

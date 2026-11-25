@@ -134,10 +134,12 @@ async def get_admin_user(
 
 
 async def verify_service_token(request: Request):
-    """Dependency: validate X-Service-Token header for internal service calls.
+    """Dependency: validate X-Service-Token header for tool-callback calls.
 
-    Used by eval container endpoints that need to authenticate without
-    a user JWT. The service token is configured via DELTA_SERVICE_TOKEN.
+    Scoped to the tool-callback endpoints only (tool proposals and doc
+    fetches made by sandboxed agent tools). The token is configured via
+    DELTA_SERVICE_TOKEN and delivered to agents via the agent secrets
+    channel — never via the container environment.
 
     Sets request.state.auth_method = "service_token" so the audit middleware
     can distinguish service-to-service calls from user JWT calls.
@@ -146,6 +148,28 @@ async def verify_service_token(request: Request):
     token = settings.service_token
     if not token:
         raise HTTPException(status_code=403, detail="Service token not configured")
+    request_token = request.headers.get("X-Service-Token", "")
+    if not hmac.compare_digest(request_token, token):
+        raise HTTPException(status_code=403, detail="Invalid or missing service token")
+    request.state.auth_method = "service_token"
+
+
+async def verify_eval_service_token(request: Request):
+    """Dependency: validate X-Service-Token header for eval-service calls.
+
+    Authenticates the eval container against the backend (settings push,
+    eval chat). Uses a separate token from the tool-callback verifier so a
+    leaked eval token cannot propose tools or fetch docs, and vice versa.
+    Configured via DELTA_EVAL_SERVICE_TOKEN (auto-generated to
+    /data/secrets/eval_service_token on first run).
+
+    Sets request.state.auth_method = "service_token" so the audit middleware
+    can distinguish service-to-service calls from user JWT calls.
+    """
+    settings = get_settings()
+    token = settings.eval_service_token
+    if not token:
+        raise HTTPException(status_code=403, detail="Eval service token not configured")
     request_token = request.headers.get("X-Service-Token", "")
     if not hmac.compare_digest(request_token, token):
         raise HTTPException(status_code=403, detail="Invalid or missing service token")

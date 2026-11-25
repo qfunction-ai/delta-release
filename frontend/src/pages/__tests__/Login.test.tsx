@@ -116,7 +116,7 @@ describe('Login page', () => {
     // Login response
     mockApiFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ access_token: 'test-jwt' }),
+      json: () => Promise.resolve({ username: 'admin' }),
     } as unknown as Response)
 
     renderLogin()

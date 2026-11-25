@@ -17,8 +17,13 @@ _PROPOSE_TOOL_TEMPLATE = '''def propose_tool(name: str, source_code: str, json_s
     """
     import json, httpx, os
 
-    # Read the API base URL and service token from environment (set at container level)
-    api_base = os.getenv("DELTA_API_BASE_URL", "http://localhost:8000")
+    # Read the API base URL and service token from environment.
+    # The token is delivered via the agent secrets channel (injected as an env
+    # var at tool execution time). The /data/config file fallback is legacy —
+    # the Letta container no longer mounts the shared config volume.
+    api_base = os.getenv("DELTA_API_BASE_URL", "")
+    if not api_base:
+        return "Error: DELTA_API_BASE_URL not configured for this agent (Delta delivers it via agent secrets)"
     service_token = os.getenv("DELTA_SERVICE_TOKEN", "")
     # Fall back to shared volume file when env var is empty (auto-generated token)
     if not service_token:
@@ -76,10 +81,12 @@ def build_propose_tool_source(agent_id: str) -> str:
     """Generate propose_tool source code with agent ID baked in.
 
     The service token is read from the DELTA_SERVICE_TOKEN environment
-    variable at runtime, with a fallback to /data/config/service_token
-    on the shared config volume (for auto-generated tokens). This prevents
-    the token from being baked into the source code while still working
-    when the token is auto-generated on first run.
+    variable at runtime. It is delivered via the agent secrets channel
+    (sync_credential_secrets keeps it in the agent's secrets, and the sandbox
+    injects it as an env var at tool execution time) — the only channel that
+    survives the Letta server's tool-env allowlist. The /data/config file
+    fallback is legacy and inert: the Letta container does not mount the
+    shared config volume.
     """
     return _PROPOSE_TOOL_TEMPLATE.format(
         agent_id=agent_id,

@@ -60,6 +60,66 @@ class TestVerifyServiceToken:
                 await verify_service_token(request)
             assert exc_info.value.status_code == 403
 
+
+class TestVerifyEvalServiceToken:
+    """Tests for verify_eval_service_token (F2 — separate eval token)."""
+
+    async def test_valid_eval_service_token(self):
+        from app.auth.dependencies import verify_eval_service_token
+
+        request = MagicMock()
+        request.headers = {"X-Service-Token": "eval-token"}
+        with patch("app.auth.dependencies.get_settings") as mock_settings:
+            mock_settings.return_value.eval_service_token = "eval-token"
+            await verify_eval_service_token(request)
+        assert request.state.auth_method == "service_token"
+
+    async def test_invalid_eval_service_token(self):
+        from app.auth.dependencies import verify_eval_service_token
+
+        request = MagicMock()
+        request.headers = {"X-Service-Token": "wrong-token"}
+        with patch("app.auth.dependencies.get_settings") as mock_settings:
+            mock_settings.return_value.eval_service_token = "eval-token"
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_eval_service_token(request)
+            assert exc_info.value.status_code == 403
+
+    async def test_no_configured_eval_service_token(self):
+        from app.auth.dependencies import verify_eval_service_token
+
+        request = MagicMock()
+        request.headers = {"X-Service-Token": "some-token"}
+        with patch("app.auth.dependencies.get_settings") as mock_settings:
+            mock_settings.return_value.eval_service_token = ""
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_eval_service_token(request)
+            assert exc_info.value.status_code == 403
+
+    async def test_tool_callback_token_rejected_on_eval_verifier(self):
+        """Cross-token isolation: the tool-callback token must not authenticate eval endpoints."""
+        from app.auth.dependencies import verify_eval_service_token
+
+        request = MagicMock()
+        request.headers = {"X-Service-Token": "tool-callback-token"}
+        with patch("app.auth.dependencies.get_settings") as mock_settings:
+            mock_settings.return_value.eval_service_token = "eval-token"
+            mock_settings.return_value.service_token = "tool-callback-token"
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_eval_service_token(request)
+            assert exc_info.value.status_code == 403
+
+    async def test_eval_token_rejected_on_tool_callback_verifier(self):
+        """Cross-token isolation: the eval token must not authenticate tool-callback endpoints."""
+        request = MagicMock()
+        request.headers = {"X-Service-Token": "eval-token"}
+        with patch("app.auth.dependencies.get_settings") as mock_settings:
+            mock_settings.return_value.eval_service_token = "eval-token"
+            mock_settings.return_value.service_token = "tool-callback-token"
+            with pytest.raises(HTTPException) as exc_info:
+                await verify_service_token(request)
+            assert exc_info.value.status_code == 403
+
     async def test_missing_service_token(self):
         request = MagicMock()
         request.headers = {}

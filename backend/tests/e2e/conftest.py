@@ -172,6 +172,18 @@ def _get_service_token() -> str:
     return os.getenv("DELTA_SERVICE_TOKEN", "")
 
 
+COOKIE_NAME = "delta_token"
+
+
+def _token_from_response(resp) -> str:
+    """F9: extract the JWT from Set-Cookie (no longer in the body)."""
+    cookie = resp.headers.get("set-cookie", "")
+    for part in cookie.split(";"):
+        if part.strip().startswith(f"{COOKIE_NAME}="):
+            return part.strip().split("=", 1)[1]
+    raise RuntimeError(f"No {COOKIE_NAME} cookie in auth response: {resp.status_code}")
+
+
 def _register_or_login(client):
     """Register the first user or log in. Returns an access token."""
     # Try login first (common case after first run)
@@ -183,7 +195,7 @@ def _register_or_login(client):
         },
     )
     if resp.status_code == 200:
-        return resp.json()["access_token"]
+        return _token_from_response(resp)
 
     # If login fails, try registration (first-user-only)
     resp = client.post(
@@ -194,7 +206,7 @@ def _register_or_login(client):
         },
     )
     if resp.status_code == 200:
-        return resp.json()["access_token"]
+        return _token_from_response(resp)
 
     # Registration taken — another user exists. Try common fallback.
     resp = client.post(
@@ -205,7 +217,7 @@ def _register_or_login(client):
         },
     )
     if resp.status_code == 200:
-        return resp.json()["access_token"]
+        return _token_from_response(resp)
 
     raise RuntimeError(f"Cannot authenticate for E2E tests: last response {resp.status_code} {resp.text}")
 
@@ -240,7 +252,7 @@ class _TokenManager:
             },
         )
         if resp.status_code == 200:
-            self._token = resp.json()["access_token"]
+            self._token = _token_from_response(resp)
             return self._token
 
         # Fallback to admin
@@ -252,7 +264,7 @@ class _TokenManager:
             },
         )
         if resp.status_code == 200:
-            self._token = resp.json()["access_token"]
+            self._token = _token_from_response(resp)
             self._username = "admin"
             self._password = "Admin123!@#"
             return self._token

@@ -2,7 +2,7 @@
 
 Self-hosted cybersecurity workflow automation powered by Letta agents.
 
-[![Test](https://github.com/qfunction-ai/delta/actions/workflows/test.yml/badge.svg)](https://github.com/qfunction-ai/delta/actions/workflows/test.yml)
+[![Test](https://github.com/qfunction-ai/delta-release/actions/workflows/test.yml/badge.svg)](https://github.com/qfunction-ai/delta-release/actions/workflows/test.yml)
 
 ## Architecture
 
@@ -37,7 +37,7 @@ Self-hosted cybersecurity workflow automation powered by Letta agents.
 |---------|------|------|
 | Frontend | 3000 | React + TypeScript (Vite) |
 | Backend | 8000 | FastAPI, async SQLAlchemy, Alembic migrations |
-| Letta Local | 8283 | Forked Letta server ([ghcr.io/qfunction-ai/letta-local](https://github.com/qfunction-ai/letta-local)) — agent execution, memory, tools, plus audit logging, tool call policies, canary checks, file persistence, and observability |
+| Letta Local | 8283 (docker-internal) | Forked Letta server ([ghcr.io/qfunction-ai/letta-local](https://github.com/qfunction-ai/letta-local)) — agent execution, memory, tools, plus audit logging, tool call policies, canary checks, file persistence, and observability. **Not published to the host by default** — for debugging or the pin-bump regression protocol, use `docker-compose.debug.yml` |
 | PostgreSQL | 5432 | Primary database (Delta + Letta) + APScheduler job store, with pgvector |
 | Redis | 6379 | Letta caching |
 | Pip Sidecar | 8001 | Package management (shared volume) |
@@ -45,6 +45,8 @@ Self-hosted cybersecurity workflow automation powered by Letta agents.
 | Ollama | 11434 | Local LLM inference (on host) |
 
 ## Quick Start
+
+> **Delta is demo software for the "AI for SOC Analysts" course.** Each release is a fresh install. If you installed an earlier version, remove it completely (`docker compose down -v`) and install the new one. No data is carried over. Back up anything you want to keep first.
 
 ### Prerequisites
 
@@ -219,6 +221,12 @@ CI runs on push and PR via GitHub Actions with five parallel jobs: `aislop` (qua
 
 **Infrastructure** — CORS with configurable origins (wildcard blocked in production). Rate limiting with auth-critical limits never relaxed in dev mode. Timing-safe service token comparison. Error detail sanitization (internal paths and tracebacks stripped). Audit logging middleware on all API requests. All containers run as non-root; Letta Local runs as UID 1000 with `cap_drop: ALL` (zero Linux capabilities), `no-new-privileges`, and read-only rootfs. Eval runner excluded from default stack to eliminate standing RCE attack surface. Postgres and Letta ports bound to 127.0.0.1 only.
 
+**Scoped Postgres role for Letta (F4)** — The Letta server connects to Postgres as a dedicated `letta` role (owning only the `letta` database), not as the superuser. The role password and a secrets-encryption key are generated on the `letta_secrets` volume at first boot, and the letta container holds no superuser credentials at all: its command wrapper builds the connection URI from the scoped password and refuses to start without one. The scoped role cannot connect to Delta's own database (`REVOKE CONNECT ON DATABASE delta FROM PUBLIC`).
+
+**Agent secrets encryption (Q-5)** — Agent secrets (including `CREDENTIAL_*` values) are encrypted at rest in the Letta database, from the first write. The key lives on the `letta_secrets` volume and in the Letta server environment; sandboxed tools cannot read the volume (it is not on any Landlock read path). If the `letta_secrets` volume is lost, encrypted agent secrets cannot be decrypted — credentials must be re-entered. **Back up the `letta_secrets` volume together with the database** (the same backup cadence as `postgres_data`): it holds the encryption key, and losing it means losing every secret LettaLocal holds. Residual: the letta database still holds every agent secret (encrypted); until further fork hardening, a tool that obtains the PG URI can still read the rows. Known and tracked.
+
+**Postgres password** — The default `delta` password is fine for local single-user use; anything exposed should set `POSTGRES_PASSWORD` (a weak value produces a startup warning, non-blocking).
+
 **Agent Security Layer (Letta Local fork)** — Tool call policies (per-agent allow/deny/approve, fail-closed on load failure). Canary tokens in memory blocks for exfiltration detection. Audit logging to append-only `security_events` table. Tool call recording in `tool_calls` table. File staging with validation before promotion to agent workspace. All three agent versions (V1, V2, V3) enforce the same security stack.
 
 ## Configuration
@@ -231,7 +239,9 @@ All variables use the `DELTA_` prefix. Docker Compose maps them from `.env`.
 |----------|-------------|
 | `DELTA_JWT_SECRET` | Token signing key — auto-generated, persisted to `/data/config/` |
 | `DELTA_CREDENTIALS_ENCRYPTION_KEY` | Fernet key for credential encryption — auto-generated, persisted |
-| `DELTA_SERVICE_TOKEN` | Service-to-service auth token — auto-generated, persisted |
+| `DELTA_SERVICE_TOKEN` | Tool-callback token (propose/fetch) — auto-generated, delivered to agents via the Letta agent-secrets channel |
+| `DELTA_EVAL_SERVICE_TOKEN` | Eval runner auth — auto-generated, persisted to `/data/secrets/` |
+| `DELTA_SIDECAR_SERVICE_TOKEN` | pip-sidecar auth — auto-generated, persisted to `/data/secrets/` |
 
 **Production overrides:**
 

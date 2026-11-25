@@ -1,4 +1,70 @@
 services:
+  # C-2 (release check): Docker creates named-volume root dirs as
+  # root:root 755 — the mount points don't exist in any image, so no
+  # ownership copy happens, and the processes that write the volumes run
+  # as non-root (appuser 1000, postgres 999, letta 1000). This one-shot
+  # service creates the directories with the right ownership BEFORE any
+  # consumer starts. Everything dropped except chown capabilities, no
+  # network, exits immediately.
+  init-volumes:
+    image: alpine:3.20
+    user: root
+    # DAC_OVERRIDE added after live testing (release-check evidence run):
+    # on Docker Desktop's VirtioFS, root without DAC_OVERRIDE cannot even
+    # stat a fresh volume dir (unmapped host UID). CHOWN/FOWNER alone made
+    # the one-shot permission fix fail intermittently depending on which
+    # layer created the file. It's a one-shot, no-network, exit-immediately
+    # container — DAC_OVERRIDE here is not a standing surface.
+    cap_add:
+      - CHOWN
+      - FOWNER
+      - DAC_OVERRIDE
+    cap_drop:
+      - ALL
+    network_mode: none
+    working_dir: /
+    # NOTE: pre-creates the FILES, not just the directories. A setgid bit
+    # on the volume root does not survive reliably on Docker Desktop's
+    # mount layer (verified live: chmod 2770 ran, the bit was gone by the
+    # time initdb created its files, which landed postgres:postgres and
+    # unreadable by the letta wrapper). Redirection into an EXISTING file
+    # preserves ownership, so pre-created 999:1000 files are written by
+    # initdb without needing group inheritance at all.
+    # Order matters on Docker Desktop's VirtioFS: root can create files in
+    # a root-owned dir but touching files in a dir already chowned to
+    # 999:1000 fails (verified live — 'touch: Permission denied'). So:
+    # L-1 (release check 3): NEVER delete or truncate the secret files.
+    # init-volumes runs on EVERY `docker compose up` (compose restarts
+    # exited one-shots), so an unconditional rm -f && touch would wipe the
+    # encryption key and PG password on every restart — the wrapper would
+    # mint a NEW key over data encrypted under the old one (every agent
+    # secret lost) and silently fall back to the Postgres superuser.
+    # Create only if missing; fix ownership and mode on every run
+    # (chown/chmod don't touch contents).
+    # Pre-creating the FILES matters because setgid on the volume root
+    # doesn't survive the mount layer: initdb's redirect (>) into a
+    # pre-owned file preserves ownership without needing group inheritance.
+    command: >
+      sh -c "set -e;
+        mkdir -p /data/secrets /letta-secrets /data/letta-secrets/server_password &&
+        { [ -e /letta-secrets/letta_pg_password ] || touch /letta-secrets/letta_pg_password; } &&
+        { [ -e /letta-secrets/letta_encryption_key ] || touch /letta-secrets/letta_encryption_key; } &&
+        chown 1000:1000 /data/secrets &&
+        chmod 0700 /data/secrets &&
+        chown 999:1000 /letta-secrets &&
+        chmod 0770 /letta-secrets &&
+        chown 999:1000 /letta-secrets/letta_pg_password /letta-secrets/letta_encryption_key &&
+        chmod 640 /letta-secrets/letta_pg_password /letta-secrets/letta_encryption_key &&
+        chown 1000:1000 /data/letta-secrets/server_password &&
+        chmod 0750 /data/letta-secrets/server_password &&
+        echo '[init-volumes] secret volume permissions set'
+      "
+    volumes:
+      - delta_secrets:/data/secrets
+      - letta_secrets:/letta-secrets
+      - letta_server_password:/data/letta-secrets/server_password
+    restart: "no"
+
   backend:
     build:
       context: .
@@ -22,13 +88,24 @@ services:
       - DELTA_PIPSIDECAR_URL=http://pip-sidecar:8001
       - DELTA_EVAL_URL=http://eval:8003
       - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+      - DELTA_EVAL_SERVICE_TOKEN=${EVAL_SERVICE_TOKEN:-}
+      - DELTA_SIDECAR_SERVICE_TOKEN=${SIDECAR_SERVICE_TOKEN:-}
       - DELTA_CORS_ORIGINS=${DELTA_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
       - DELTA_SETUP_TOKEN=${DELTA_SETUP_TOKEN:-}
       - DELTA_DEV_MODE=${DELTA_DEV_MODE:-false}
     volumes:
       - shared_config:/data/config
+      - delta_secrets:/data/secrets
+      # v0.16.39 adoption: read-only mount of the dedicated server-password
+      # volume (least privilege — the backend needs the password to
+      # authenticate to the Letta API but has no business reading the PG
+      # password or the secrets-encryption key on letta_secrets). Startup
+      # order guarantees letta (which generates it) is healthy first.
+      - letta_server_password:/data/letta-secrets/server_password:ro
       - logs:/data/logs
     depends_on:
+      init-volumes:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       letta:
@@ -95,10 +172,21 @@ services:
       - POSTGRES_DB=delta
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d:ro
+      # letta_secrets: written by the 03/04 initdb scripts on fresh volume
+      # init (letta role password + secrets encryption key). The letta
+      # container mounts the same volume at /data/letta-secrets. The
+      # volume root is chowned 999:1000 (setgid) by init-volumes so the
+      # postgres user (999) can write and the letta wrapper (1000) can
+      # read via the group.
+      - letta_secrets:/letta-secrets
       - logs:/data/logs
     command: >
       sh -c "mkdir -p /data/logs && chown 1000:1000 /data/logs &&
              docker-entrypoint.sh postgres 2>&1 | tee /data/logs/postgres.log"
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U delta -d delta"]
       interval: 5s
@@ -150,21 +238,36 @@ services:
   # Uses external Postgres + Redis (no internal services).
   # Runs as non-root (UID 1000) with no capabilities.
   letta:
-    # Pinned to 0.16.24:
-    #   0.16.22: streaming UnboundLocalError fix (V3 stream _ah shadow)
-    #   0.16.23: reset-messages soft-delete, policy rule-name errors,
-    #            agent-delete CASCADE fix, Dockerfile self-contained install
-    #   0.16.24: CASCADE fix for tool_calls.step_id and security_events.step_id
+    # Pinned to 0.16.39 by digest (Phase 1 security-fixes pin bump,
+    # 2026-11-25). Fifteen releases from 0.16.23, all reviewed as they
+    # shipped; the load-bearing ones for Delta:
+    #   0.16.24: agent-delete CASCADE fix
+    #   0.16.25: V3 streaming canary filter live (construction order + flush)
+    #   0.16.29: run abort API
+    #   0.16.36: max_tokens completion cap for Ollama 0.40.4+
+    #   0.16.38: API auth by default, tool env allowlist, value-scrub of
+    #            server password / PG URI / encryption key (L-1/L-2/L-3)
+    #   0.16.39: B-9 400s on secret values carrying server credentials,
+    #            LETTA_REQUIRE_ENCRYPTION, /v1/health/ Landlock reporting
     # Update: docker compose pull letta && docker compose up -d
-    image: ghcr.io/qfunction-ai/letta-local:0.16.24
+    image: ghcr.io/qfunction-ai/letta-local:0.16.39@sha256:a4436356cd5fc801f1cf33158ca33362323c362b84cc33746d8fc0660ee480e0
     user: "1000:1000"
     read_only: true
-    ports:
-      - "127.0.0.1:8283:8283"
+    # F5: 8283 is NOT published to the host by default. The backend reaches
+    # letta over the docker network (http://letta:8283); a host publication
+    # only serves human debugging — and an unauthenticated localhost port
+    # does not stop DNS-rebinding browser attacks. For debugging and the
+    # pin-bump regression protocol, use docker-compose.debug.yml.
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
-      - DELTA_API_BASE_URL=http://backend:8000
-      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+      # DELTA_SERVICE_TOKEN is NOT in the letta env (adoption item 4).
+      # Note: the entry actually went missing in 359945a — an incomplete
+      # revert of a premature removal restored the comment but not the
+      # line — and the pin bump to 0.16.39 makes that state correct: env
+      # inheritance dies (v0.16.38 change 2) and the agent-secrets channel
+      # (F2) is the only delivery path. Agents created or synced after F2
+      # get the token at creation/sync (fresh-install only — there is no
+      # upgrade path).
       # PYTHONPATH: /app needed because GHCR image's editable install has
       # letta-0.16.8.dist-info but no .pth file pointing to /app.
       # /extra-packages for pip-sidecar installed packages.
@@ -182,8 +285,11 @@ services:
       - LETTA_LANDLOCK_ALLOW_TCP_CONNECT=true
       # OpenTelemetry — send traces + metrics to the OTel Collector
       - LETTA_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      # External Postgres + Redis (no internal services)
-      - LETTA_PG_URI=postgresql://${POSTGRES_USER:-delta}:${POSTGRES_PASSWORD:-delta}@postgres:5432/letta
+      # External Postgres + Redis (no internal services). No LETTA_PG_URI
+      # in the environment: the letta container must never hold
+      # superuser credentials. The command wrapper below builds the
+      # scoped-role URI from letta_pg_password and refuses to start
+      # without it.
       - LETTA_REDIS_HOST=redis
       - HOME=/home/letta
       # LETTA_NO_DEFAULT_ACTOR: When true, requires a non-default user_id header
@@ -194,14 +300,71 @@ services:
     volumes:
       - letta_data:/home/letta/.letta
       - extra_packages:/extra-packages
-      - shared_config:/data/config:ro
       - logs:/data/logs
+      # letta_secrets: role password + encryption key, generated by the
+      # postgres initdb scripts on first boot. Read by the
+      # command wrapper below, NOT by sandboxed tools: /data/letta-secrets
+      # is not on the fork's Landlock read paths, and the files are read
+      # before the sandbox exists.
+      - letta_secrets:/data/letta-secrets
+      # Dedicated server-password volume — the backend mounts THIS volume
+      # read-only (not letta_secrets), so it gets the API password without
+      # the PG password or the encryption key.
+      - letta_server_password:/data/letta-secrets/server_password
     tmpfs:
       - /tmp:noexec,nosuid,size=128m
     entrypoint: ["/bin/sh", "-c"]
+    # F4 wrapper: build the scoped-role PG URI from letta_pg_password
+    # (generated by postgres initdb 03 on first boot). No superuser
+    # fallback: an empty password means a pre-2026-11 install, and Delta
+    # is fresh-install only — refuse to start.
+    # F4/Q-5: export the secrets-encryption key (initdb 04) so agent
+    # secrets are encrypted at rest. LETTA_REQUIRE_ENCRYPTION=true makes
+    # the fork (v0.16.39+) refuse to start without a key.
+    # v0.16.39 adoption item 1: generate the server password on first
+    # start, in its own subdirectory on the letta_secrets volume. The
+    # backend mounts ONLY that subdirectory (least privilege: its read
+    # does not expose the PG password or encryption key). Startup order
+    # guarantees letta generates before the backend reads (backend
+    # depends_on letta healthy). Explicit LETTA_SERVER_PASSWORD env
+    # still wins (fork precedence: env > file).
+    # Also (adoption item 3, D-5): warn loudly when Landlock is not
+    # active — the fork's /v1/health/ reports it, and the LOCAL
+    # executor fallback lets tools read /data/letta-secrets.
     command: >
-      "./letta/server/startup.sh 2>&1 | tee /data/logs/letta.log"
+      "PGPW=$$(cat /data/letta-secrets/letta_pg_password 2>/dev/null);
+       if [ -n \"$$PGPW\" ]; then
+         export LETTA_PG_URI=\"postgresql://letta:$$PGPW@postgres:5432/letta\";
+         echo '[F4] Connecting as scoped role letta';
+       else
+         echo '[F4] FATAL: no scoped database password. This looks like an install from before 2026-11; Delta is fresh-install only. Run: docker compose down -v && docker compose up -d'; exit 1;
+       fi;
+       if [ ! -s /data/letta-secrets/letta_encryption_key ]; then
+         if [ -e /data/letta-secrets/letta_encryption_key.sentinel ]; then
+           echo '[F4] FATAL: letta_encryption_key is empty but a sentinel exists - the key was lost (volume wiped?). Restore the letta_secrets volume from backup: a new key would make every existing agent secret undecryptable.'; exit 1;
+         fi;
+         head -c 32 /dev/urandom | base64 > /data/letta-secrets/letta_encryption_key;
+         chmod 640 /data/letta-secrets/letta_encryption_key;
+         echo '[F4] Generated secrets encryption key on first start';
+       fi;
+       touch /data/letta-secrets/letta_encryption_key.sentinel;
+       export LETTA_ENCRYPTION_KEY=$$(cat /data/letta-secrets/letta_encryption_key);
+       export LETTA_REQUIRE_ENCRYPTION=true;
+       if [ ! -s /data/letta-secrets/server_password/password ]; then
+         if [ -e /data/letta-secrets/server_password/password.sentinel ]; then
+           echo '[F4] FATAL: server password is empty but a sentinel exists - the password was lost (volume wiped?). Restore the letta_secrets volume from backup; the backend will 401 against any regenerated password.'; exit 1;
+         fi;
+         mkdir -p /data/letta-secrets/server_password;
+         head -c 32 /dev/urandom | base64 > /data/letta-secrets/server_password/password;
+         chmod 640 /data/letta-secrets/server_password/password;
+         echo '[F4] Generated Letta server password on first start';
+       fi;
+       touch /data/letta-secrets/server_password/password.sentinel;
+       export LETTA_SERVER_PASSWORD=$$(cat /data/letta-secrets/server_password/password);
+       ./letta/server/startup.sh 2>&1 | tee /data/logs/letta.log"
     depends_on:
+      init-volumes:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       redis:
@@ -238,11 +401,16 @@ services:
     cap_drop:
       - ALL
     environment:
-      - DELTA_SERVICE_TOKEN=${SERVICE_TOKEN:-}
+      # Sidecar token comes from the delta_secrets volume (auto-generated by
+      # the backend) — never passed through the environment.
+      - DELTA_SIDECAR_SERVICE_TOKEN=${SIDECAR_SERVICE_TOKEN:-}
     volumes:
       - extra_packages:/extra-packages
-      - shared_config:/data/config:ro
+      - delta_secrets:/data/secrets:ro
       - logs:/data/logs
+    depends_on:
+      init-volumes:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
       interval: 10s
@@ -328,6 +496,9 @@ volumes:
   postgres_data:
   letta_data:
   shared_config:
+  delta_secrets:
+  letta_secrets:
+  letta_server_password:
   extra_packages:
   logs:
   otel_traces:

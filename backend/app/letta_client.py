@@ -41,11 +41,20 @@ def get_letta_client() -> Letta:
     be restarted to pick up the new URL. This is intentional: the
     client is used across hundreds of requests and recreating it per
     request would add unnecessary overhead.
+
+    v0.16.39 adoption: when a Letta server password is configured, it is
+    passed as the SDK api_key — the SDK turns it into
+    `Authorization: Bearer <password>`, exactly what the fork's
+    CheckPasswordMiddleware accepts. api_key is ALWAYS passed explicitly
+    (empty string when no password): the SDK would otherwise pick up
+    LETTA_API_KEY from the environment, which is a different credential
+    and would 401 against the fork's password check.
     """
     settings = get_settings()
     return Letta(
         base_url=settings.letta_base_url,
         timeout=_LETTA_TIMEOUT,
+        api_key=settings.letta_server_password or "",
     )
 
 

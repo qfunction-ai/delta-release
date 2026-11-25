@@ -10,7 +10,7 @@ from app.agents.models import Agent
 from app.agents.prompts import extract_message_parts
 from app.agents.run_prep import prepare_chat_run
 from app.async_utils import event_to_sse, sse_response, stream_letta_response
-from app.auth.dependencies import get_current_user, resolve_agent_user, verify_service_token
+from app.auth.dependencies import get_current_user, resolve_agent_user, verify_eval_service_token
 from app.auth.models import User
 from app.chat.schemas import ChatHistoryMessage, ChatHistoryResponse, ChatRequest, ChatResponse
 from app.config import get_settings
@@ -246,7 +246,7 @@ async def stream_message(
 async def eval_chat(
     request: Request,
     chat: ChatRequest,
-    _auth=Depends(verify_service_token),
+    _auth=Depends(verify_eval_service_token),
     db: AsyncSession = Depends(get_db),
 ):
     """Service-to-service chat for the eval container.

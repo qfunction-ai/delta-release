@@ -43,7 +43,7 @@ export default function ToolProposalList({
                   <span className="badge badge-warning ml-4">AI-generated</span>
                 </div>
                 <span className="text-sm text-muted">
-                  {proposal.dry_run_error ? 'Dry run failed' : 'Dry run passed'}
+                  {proposal.dry_run_error ? 'Registration check failed' : 'Registration check passed'}
                 </span>
               </div>
               {proposal.description && (
@@ -74,9 +74,9 @@ export default function ToolProposalList({
             <p className="text-sm mb-4">{viewingProposal.description}</p>
           )}
 
-          {/* Dry Run Results */}
+          {/* Registration Check Results */}
           <div className="mb-4">
-            <h4 style={{ margin: 0, marginBottom: '0.375rem' }}>Dry Run Results</h4>
+            <h4 style={{ margin: 0, marginBottom: '0.375rem' }}>Registration Check Results</h4>
             {viewingProposal.dry_run_error ? (
               <div className="error" style={{ fontSize: '0.8125rem' }}>{viewingProposal.dry_run_error}</div>
             ) : (

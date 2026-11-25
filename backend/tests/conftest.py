@@ -19,6 +19,20 @@ _project_root = str(Path(__file__).resolve().parent.parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+# F9: login/register responses no longer carry the JWT in the body —
+# extract it from the Set-Cookie header instead.
+COOKIE_NAME = "delta_token"
+
+
+def token_from_response(resp) -> str:
+    """Extract the JWT from the Set-Cookie header of an auth response."""
+    cookie = resp.headers.get("set-cookie", "")
+    for part in cookie.split(";"):
+        if part.strip().startswith(f"{COOKIE_NAME}="):
+            return part.strip().split("=", 1)[1]
+    raise AssertionError(f"No {COOKIE_NAME} cookie in response: {resp.headers}")
+
+
 # Save the real service token before overriding it — E2E tests need the
 # real token to authenticate against the live backend, while unit tests
 # use a fake value that doesn't leak into the shared config volume.
@@ -234,7 +248,7 @@ async def registered_client(app_client):
         },
     )
     assert resp.status_code == 200, f"Registration failed: {resp.text}"
-    token = resp.json()["access_token"]
+    token = token_from_response(resp)
     headers = {"Authorization": f"Bearer {token}"}
     return app_client, headers, token
 
@@ -304,7 +318,7 @@ async def admin_client(app_client):
         },
     )
     assert resp.status_code == 200, f"Admin registration failed: {resp.text}"
-    token = resp.json()["access_token"]
+    token = token_from_response(resp)
     headers = {"Authorization": f"Bearer {token}"}
     return app_client, headers, token
 

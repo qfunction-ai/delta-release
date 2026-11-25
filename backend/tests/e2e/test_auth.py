@@ -106,7 +106,9 @@ class TestAuthEdgeCases:
             },
         )
         assert resp.status_code == 200
-        new_token = resp.json()["access_token"]
+        from .conftest import _token_from_response
+
+        new_token = _token_from_response(resp)
 
         # Change back to original — the second change invalidates new_token,
         # so we must re-login afterward to get a fresh token.
@@ -131,7 +133,7 @@ class TestAuthEdgeCases:
                 },
             )
             if resp2.status_code == 200:
-                fresh_token = resp2.json()["access_token"]
+                fresh_token = _token_from_response(resp2)
                 headers_fresh = {"Authorization": f"Bearer {fresh_token}"}
                 resp = e2e_client.post(
                     "/api/auth/change-password",

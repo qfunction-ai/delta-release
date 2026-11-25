@@ -26,12 +26,37 @@ _BLOCKED_NETWORKS = [
 _ALLOWED_SCHEMES = {"http", "https"}
 
 
+def _unwrap_embedded_ipv4(ip: ipaddress.IPv6Address) -> ipaddress.IPv6Address:
+    """Unwrap IPv4 addresses embedded in IPv6 forms (F8).
+
+    IPv4-mapped (::ffff:169.254.169.254), NAT64 (64:ff9b::/96), and 6to4
+    (2002::/16) all embed an IPv4 address that the IPv4 network list below
+    never matches — unwrap them so the existing checks apply. On Python
+    3.12, neither is_link_local nor is_private is usable for the mapped
+    form (is_link_local is False for it; is_private is True for EVERY
+    mapped address including public ones), so the unwrap is the fix, not
+    property checks.
+    """
+    if ip.version == 6:
+        if ip.ipv4_mapped is not None:
+            return ip.ipv4_mapped
+        if ip.sixtofour is not None:
+            return _unwrap_embedded_ipv4(ip.sixtofour)
+        # NAT64: 64:ff9b::/96 with the IPv4 in bytes 4-8
+        if ip in ipaddress.ip_network("64:ff9b::/96"):
+            embedded = ipaddress.IPv6Address(int(ip) & 0x00000000FFFFFFFF)
+            return ipaddress.IPv4Address(int(embedded) & 0xFFFFFFFF)
+    return ip
+
+
 def _is_private_ip(ip_str: str) -> bool:
     """Check if an IP address falls within any blocked network."""
     try:
         ip = ipaddress.ip_address(ip_str)
     except ValueError:
         return True  # Treat unparseable IPs as private (fail closed)
+
+    ip = _unwrap_embedded_ipv4(ip)
 
     for network in _BLOCKED_NETWORKS:
         if ip in network:
